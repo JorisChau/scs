@@ -75,8 +75,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: brew update && brew install openblas lapack
-      - run: make DLONG=${{ matrix.long }} USE_LAPACK=${{ matrix.lapack }}
-      - run: make test DLONG=${{ matrix.long }} USE_LAPACK=${{ matrix.lapack }}
+      - run: make DLONG=${{ matrix.long }} USE_LAPACK=${{ matrix.lapack }} USE_CSD_CONE=1
+      - run: make test DLONG=${{ matrix.long }} USE_LAPACK=${{ matrix.lapack }} USE_CSD_CONE=1
       - run: out/run_tests_direct
       - run: out/run_tests_indirect
 

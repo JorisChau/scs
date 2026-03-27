@@ -180,6 +180,15 @@ ifneq ($(USE_LAPACK), 0)
   endif
 endif
 
+############ CSD CONES #################
+# set USE_CSD_CONE = 1 to enable complex PSD cones 
+
+USE_CSD_CONE = 1
+ifneq ($(USE_CSD_CONE), 0)
+  CUSTOM_FLAGS += -DUSE_CSD_CONE
+endif
+
+
 ############ SPECTRAL CONES ############
 USE_SPECTRAL_CONES = 0
 ifneq ($(USE_SPECTRAL_CONES), 0)

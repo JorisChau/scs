@@ -55,6 +55,7 @@ void BLAS(syevr)(const char *jobz, const char *range, const char *uplo,
                  blas_int *isuppz, scs_float *work, blas_int *lwork,
                  blas_int *iwork, blas_int *liwork, blas_int *info);
 
+#ifdef USE_CSD_CONE
 void BLASC(heevr)(const char *jobz, const char *range, const char *uplo,
                   blas_int *n, SCS_BLAS_COMPLEX_TYPE *a, blas_int *lda,
                   scs_float *vl, scs_float *vu, blas_int *il, blas_int *iu,
@@ -63,6 +64,7 @@ void BLASC(heevr)(const char *jobz, const char *range, const char *uplo,
                   SCS_BLAS_COMPLEX_TYPE *cwork, blas_int *lcwork,
                   scs_float *rwork, blas_int *lrwork, blas_int *iwork,
                   blas_int *liwork, blas_int *info);
+#endif
 
 blas_int BLAS(syrk)(const char *uplo, const char *trans, const blas_int *n,
                     const blas_int *k, const scs_float *alpha,
@@ -171,6 +173,7 @@ void SCS(deep_copy_cone)(ScsCone *dest, const ScsCone *src) {
     dest->s = SCS_NULL;
   }
 
+  #ifdef USE_CSD_CONE
   /* Complex PSD */
   if (src->cssize > 0) {
     dest->cs = (scs_int *)scs_calloc(src->cssize, sizeof(scs_int));
@@ -178,6 +181,7 @@ void SCS(deep_copy_cone)(ScsCone *dest, const ScsCone *src) {
   } else {
     dest->cs = SCS_NULL;
   }
+#endif
 
   /* Power */
   if (src->psize > 0) {
@@ -235,9 +239,11 @@ void SCS(deep_copy_cone)(ScsCone *dest, const ScsCone *src) {
 static inline scs_int get_sd_cone_size(scs_int s) {
   return (s * (s + 1)) / 2;
 }
+#ifdef USE_CSD_CONE
 static inline scs_int get_csd_cone_size(scs_int cs) {
   return cs * cs;
 }
+#endif
 
 void SCS(set_r_y)(const ScsConeWork *c, scs_float scale, scs_float *r_y) {
   scs_int i;
@@ -278,13 +284,13 @@ void SCS(enforce_cone_boundaries)(const ScsConeWork *c, scs_float *vec,
  */
 void set_cone_boundaries(const ScsCone *k, ScsConeWork *c) {
   scs_int i, count = 0;
-#ifdef USE_SPECTRAL_CONES
-  scs_int total_cones = k->qsize + k->ssize + k->cssize + k->ed + k->ep +
-                        k->psize + k->dsize + k->nucsize + k->ell1_size +
-                        k->sl_size;
+#ifdef USE_CSD_CONE
+  scs_int total_cones = k->qsize + k->ssize + k->cssize + k->ed + k->ep + k->psize;
 #else
-  scs_int total_cones =
-      k->qsize + k->ssize + k->cssize + k->ed + k->ep + k->psize;
+  scs_int total_cones = k->qsize + k->ssize + k->ed + k->ep + k->psize;
+#endif
+#ifdef USE_SPECTRAL_CONES
+  total_cones += k->dsize + k->nucsize + k->ell1_size + k->sl_size;
 #endif
   scs_int *b = (scs_int *)scs_calloc(total_cones + 1, sizeof(scs_int));
 
@@ -294,8 +300,10 @@ void set_cone_boundaries(const ScsCone *k, ScsConeWork *c) {
     b[count++] = k->q[i];
   for (i = 0; i < k->ssize; ++i)
     b[count++] = get_sd_cone_size(k->s[i]);
+#ifdef USE_CSD_CONE
   for (i = 0; i < k->cssize; ++i)
     b[count++] = get_csd_cone_size(k->cs[i]);
+#endif
   for (i = 0; i < k->ep + k->ed; ++i)
     b[count++] = 3;
   for (i = 0; i < k->psize; ++i)
@@ -322,8 +330,10 @@ static scs_int get_full_cone_dims(const ScsCone *k) {
     dims += k->q[i];
   for (i = 0; i < k->ssize; ++i)
     dims += get_sd_cone_size(k->s[i]);
+#ifdef USE_CSD_CONE
   for (i = 0; i < k->cssize; ++i)
     dims += get_csd_cone_size(k->cs[i]);
+#endif
   dims += 3 * (k->ed + k->ep + k->psize);
 #ifdef USE_SPECTRAL_CONES
   for (i = 0; i < k->dsize; ++i)
@@ -389,6 +399,7 @@ scs_int SCS(validate_cones)(const ScsData *d, const ScsCone *k) {
       }
     }
   }
+#ifdef USE_CSD_CONE
   if (k->cssize && k->cs) {
     if (k->cssize < 0) {
       scs_printf("complex psd cone dimension error\n");
@@ -401,6 +412,7 @@ scs_int SCS(validate_cones)(const ScsData *d, const ScsCone *k) {
       }
     }
   }
+#endif
   if (k->ed && k->ed < 0) {
     scs_printf("ep cone dimension error\n");
     return -1;
@@ -551,6 +563,7 @@ char *SCS(get_cone_header)(const ScsCone *k) {
     sprintf(tmp + strlen(tmp), "\t  s: psd vars: %li, ssize: %li\n",
             (long)count, (long)k->ssize);
   }
+#ifdef USE_CSD_CONE
   if (k->cssize) {
     count = 0;
     for (i = 0; i < k->cssize; ++i)
@@ -558,6 +571,7 @@ char *SCS(get_cone_header)(const ScsCone *k) {
     sprintf(tmp + strlen(tmp), "\t  cs: complex psd vars: %li, cssize: %li\n",
             (long)count, (long)k->cssize);
   }
+#endif
   if (k->ep || k->ed) {
     sprintf(tmp + strlen(tmp), "\t  e: exp vars: %li, dual exp vars: %li\n",
             (long)(3 * k->ep), (long)(3 * k->ed));
@@ -636,10 +650,12 @@ static scs_int set_up_cone_work_spaces(ScsConeWork *c, const ScsCone *k) {
     n_max = MAX(n_max, (blas_int)k->s[i]);
     n_max_real = MAX(n_max_real, (blas_int)k->s[i]);
   }
+#ifdef USE_CSD_CONE
   for (i = 0; i < k->cssize; ++i) {
     n_max = MAX(n_max, (blas_int)k->cs[i]);
     n_max_csd = MAX(n_max_csd, (blas_int)k->cs[i]);
   }
+#endif
 
 #ifdef USE_SPECTRAL_CONES
   blas_int n_max_logdet = 1;
@@ -712,6 +728,7 @@ static scs_int set_up_cone_work_spaces(ScsConeWork *c, const ScsCone *k) {
     liwork_max = MAX(liwork_max, iwkopt);
   }
 
+#ifdef USE_CSD_CONE
   /* 2. Complex PSD Workspace Query (heevr) */
   if (k->cssize > 0) {
     c->cXs = (scs_complex_float *)scs_calloc(n_max_csd * n_max_csd,
@@ -744,6 +761,7 @@ static scs_int set_up_cone_work_spaces(ScsConeWork *c, const ScsCone *k) {
     lwork_max = MAX(lwork_max, (blas_int)lrwork_opt);
     liwork_max = MAX(liwork_max, liwork_opt_c);
   }
+#endif
 
 #ifdef USE_SPECTRAL_CONES
   /* 3. Nuclear Norm Workspace (gesvd) */
@@ -794,20 +812,25 @@ static scs_int set_up_cone_work_spaces(ScsConeWork *c, const ScsCone *k) {
   return 0;
 #else
   /* Non-LAPACK fallback check */
-  if (k->ssize > 0 || k->cssize > 0) {
+  if (k->ssize > 0) {
     for (i = 0; i < k->ssize; i++) {
       if (k->s[i] > 1) {
-        scs_printf("FATAL: SDP/Complex SDP requires BLAS/LAPACK.\n");
-        return -1;
-      }
-    }
-    for (i = 0; i < k->cssize; i++) {
-      if (k->cs[i] > 1) {
-        scs_printf("FATAL: SDP/Complex SDP requires BLAS/LAPACK.\n");
+        scs_printf("FATAL: SDP requires BLAS/LAPACK.\n");
         return -1;
       }
     }
   }
+#ifdef USE_CSD_CONE
+  if (k->cssize > 0) {
+       for (i = 0; i < k->cssize; i++)
+    {
+      if (k->cs[i] > 1) {
+        scs_printf("FATAL: Complex SDP requires BLAS/LAPACK.\n");
+        return -1;
+      }
+    }
+  }
+#endif
 #ifdef USE_SPECTRAL_CONES
   if (k->dsize > 0 || k->nucsize > 0 || k->sl_size > 0) {
     scs_printf("FATAL: Spectral cones require BLAS/LAPACK.\n");
@@ -906,6 +929,7 @@ static scs_int proj_semi_definite_cone(scs_float *X, const scs_int n,
 #endif
 }
 
+#ifdef USE_CSD_CONE
 /*
  * Projection: Complex Semi-Definite Cone
  */
@@ -994,6 +1018,7 @@ static scs_int proj_complex_semi_definite_cone(scs_float *X, const scs_int n,
   return -1;
 #endif
 }
+#endif
 
 /*
  * Projection: Box Cone
@@ -1215,7 +1240,7 @@ static scs_int proj_cone(scs_float *x, const ScsCone *k, ScsConeWork *c,
       count += get_sd_cone_size(k->s[i]);
     }
   }
-
+#ifdef USE_CSD_CONE
   /* 6. Complex PSD Cone */
   if (k->cssize) {
     for (i = 0; i < k->cssize; ++i) {
@@ -1225,7 +1250,7 @@ static scs_int proj_cone(scs_float *x, const ScsCone *k, ScsConeWork *c,
       count += get_csd_cone_size(k->cs[i]);
     }
   }
-
+#endif
   if (k->ep || k->ed) { /* doesn't use r_y */
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -1333,7 +1358,10 @@ ScsConeWork *SCS(init_cone)(ScsCone *k, scs_int m) {
   c->s = (scs_float *)scs_calloc(m, sizeof(scs_float));
 
   /* Set up workspaces if matrix cones are present */
-  if ((k->ssize && k->s) || (k->cssize && k->cs)
+  if ((k->ssize && k->s) 
+#ifdef USE_CSD_CONE
+  || (k->cssize && k->cs)
+#endif
 #ifdef USE_SPECTRAL_CONES
       || (k->dsize) || (k->nucsize) || (k->sl_size)
 #endif

@@ -32,7 +32,7 @@ _SKIP(test_validation)
 #endif
 
 /* solve SDPs, requires blas / lapack */
-#if defined(USE_LAPACK)
+#if defined(USE_LAPACK) && defined(USE_CSD_CONE)
 #include "problems/complex_PSD.h"
 #include "problems/sd_and_complex_sd.h"
 #else

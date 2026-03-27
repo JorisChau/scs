@@ -66,6 +66,10 @@ executing, e.g., :code:`make DLONG=1`, to set the :code:`DLONG` flag to True.
      - Whether to link in :ref:`BLAS/LAPACK <blas_lapack>`
      - True/False
      - 1
+   * - :code:`USE_CSD_CONE`
+     - Whether to enable complex semidefinite cones
+     - True/False
+     - 1
    * - :code:`USE_OPENMP`
      - Use openmp to parallelize some computation
      - True/False
