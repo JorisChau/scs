@@ -6,15 +6,13 @@ extern "C" {
 #endif
 
 #include "glbopts.h"
-#include "scs.h"
 #include "scs_blas.h"
 #include "scs_work.h"
-#include <string.h>
 
 #ifdef USE_SPECTRAL_CONES
-#include "util_spectral_cones.h" // for newton_stats
+#include "util_spectral_cones.h" /* for Newton_stats */
 
-// macro for time measurements of SpectralSCS
+/* macro for time measurements of SpectralSCS */
 #ifdef SPECTRAL_TIMING_FLAG
 #define SPECTRAL_TIMING(action) action
 #else
@@ -37,6 +35,7 @@ struct SCS_CONE_WORK {
   scs_int m;            /* total length of cone */
   /* box cone quantities */
   scs_float box_t_warm_start;
+  scs_float *r_box_inv; /* precomputed 1/r_box[j] for box cone Newton */
 
 #ifdef USE_LAPACK
   /* workspace for eigenvector decompositions: */
@@ -54,7 +53,7 @@ struct SCS_CONE_WORK {
   Value_index *work_ell1;
   scs_float *work_ell1_proj;
 
-  // used for timing spectral vector cone and spectral matrix cone projections
+  /* used for timing spectral vector cone and spectral matrix cone projections */
   SPECTRAL_TIMING(scs_float tot_time_mat_cone_proj;)
   SPECTRAL_TIMING(scs_float tot_time_vec_cone_proj;)
 
@@ -79,7 +78,7 @@ struct SCS_CONE_WORK {
 };
 
 void SCS(free_cone)(ScsCone *k);
-void SCS(deep_copy_cone)(ScsCone *dest, const ScsCone *src);
+scs_int SCS(deep_copy_cone)(ScsCone *dest, const ScsCone *src);
 ScsConeWork *SCS(init_cone)(ScsCone *k, scs_int m);
 char *SCS(get_cone_header)(const ScsCone *k);
 scs_int SCS(validate_cones)(const ScsData *d, const ScsCone *k);

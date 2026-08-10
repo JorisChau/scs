@@ -1,3 +1,9 @@
+/*
+ * Problem data normalization (equilibration) of b and c vectors,
+ * and solution normalization/un-normalization routines.
+ * Matrix normalization (A, P) is in linsys/scs_matrix.c.
+ */
+
 #include "normalize.h"
 
 #include "linalg.h"
@@ -62,10 +68,9 @@ void SCS(normalize_sol)(ScsScaling *scal, ScsSolution *sol) {
   for (i = 0; i < scal->n; ++i) {
     sol->x[i] /= (E[i] / scal->dual_scale);
   }
+  /* Fuse the y and s loops: both index D[i], halving D reads. */
   for (i = 0; i < scal->m; ++i) {
     sol->y[i] /= (D[i] / scal->primal_scale);
-  }
-  for (i = 0; i < scal->m; ++i) {
     sol->s[i] *= (D[i] * scal->dual_scale);
   }
 }
@@ -77,26 +82,10 @@ void SCS(un_normalize_sol)(ScsScaling *scal, ScsSolution *sol) {
   for (i = 0; i < scal->n; ++i) {
     sol->x[i] *= (E[i] / scal->dual_scale);
   }
+  /* Fuse the y and s loops: both index D[i], halving D reads. */
   for (i = 0; i < scal->m; ++i) {
     sol->y[i] *= (D[i] / scal->primal_scale);
-  }
-  for (i = 0; i < scal->m; ++i) {
     sol->s[i] /= (D[i] * scal->dual_scale);
   }
 }
 
-void SCS(un_normalize_primal)(ScsScaling *scal, scs_float *r) {
-  scs_int i;
-  scs_float *D = scal->D;
-  for (i = 0; i < scal->m; ++i) {
-    r[i] /= (D[i] * scal->dual_scale);
-  }
-}
-
-void SCS(un_normalize_dual)(ScsScaling *scal, scs_float *r) {
-  scs_int i;
-  scs_float *E = scal->E;
-  for (i = 0; i < scal->n; ++i) {
-    r[i] /= (E[i] * scal->primal_scale);
-  }
-}

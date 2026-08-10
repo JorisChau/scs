@@ -49,12 +49,13 @@ project
 
 .. code:: bash
 
-  cmake -DCMAKE_INSTALL_PREFIX:PATH=<custom-folder> -BUILD_SHARED_LIBS=OFF ../
+  cmake -DCMAKE_INSTALL_PREFIX:PATH=<custom-folder> -DBUILD_SHARED_LIBS=OFF ../
   make
 
 The CMake build-system exports two CMake targets called :code:`scs::scsdir` and
 :code:`scs::scsindir` as well as a header file :code:`scs.h` that defines the
-API.
+API. When LAPACK is available (the default), it also exports
+:code:`scs::scsdense` for the :ref:`dense direct <dense>` solver.
 
 MKL
 """
@@ -67,6 +68,13 @@ set, then additionally CMake will build and install the :ref:`MKL Pardiso
 MKL compiler flags might not be right for your system and may need to be
 `modified
 <https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html>`_).
+
+The :code:`BLAS64` compile flag is a general SCS flag for ILP64 BLAS/LAPACK
+libraries. When using the MKL Pardiso backend specifically, :code:`BLAS64=1`
+must be paired with :code:`DLONG=1` so that :code:`pardiso_64` matches the
+64-bit BLAS interface. In the CMake build, :code:`BLAS64=ON` also requires
+that CMake can find an ILP64 BLAS/LAPACK implementation; if autodetection
+needs help, set :code:`BLA_VENDOR` explicitly.
 
 
 GPU
@@ -82,7 +90,7 @@ with cuDSS support using CMake. First, ensure that the :code:`CUDA_PATH` and
   cmake -DCMAKE_INSTALL_PREFIX:PATH=<custom-folder> -DUSE_CUDSS=ON -DDLONG=OFF ../
   make
 
-Currently cuDSS only supports 32 bit integers (for sparse matrix idicies) so
+Currently cuDSS only supports 32 bit integers (for sparse matrix indices) so
 :code:`DDLONG=OFF` is mandatory.
 This will build and install the cuDSS linear solver with target
 :code:`scs::scscudss`.
@@ -107,6 +115,9 @@ by calling target_link_libraries as in the following example:
 
   # To use the MKL Pardiso direct method
   target_link_libraries(example scs::scsmkl)
+
+  # To use the dense direct method (requires LAPACK)
+  target_link_libraries(example scs::scsdense)
 
   # To use the cuDSS direct method
   target_link_libraries(example scs::scscudss)
@@ -152,6 +163,21 @@ This will produce static library :code:`libscsmkl.a` and dynamic library
 for your system and may need to be `modified
 <https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html>`_).
 
+If you want 64-bit BLAS/LAPACK integers with the MKL Pardiso backend, build
+with both :code:`BLAS64=1` and :code:`DLONG=1`.
+
+To compile and test the :ref:`dense direct <dense>` solver (requires LAPACK):
+
+.. code:: bash
+
+  make dense
+  out/run_tests_dense
+
+This will produce static library :code:`libscsdense.a` and dynamic library
+:code:`libscsdense.ext` (where :code:`.ext` is platform dependent) in the
+:code:`out` folder. The dense solver is best suited for small to medium-sized
+problems.
+
 If you have a GPU and have CUDA installed, you can also execute make gpu to
 compile SCS to run on the GPU which will create additional libraries and demo
 binaries in the out folder corresponding to the GPU version.  Note that the GPU
@@ -173,7 +199,7 @@ have CUDA toolkit, the :code:`nvcc` compiler, and `cuDSS
   make cudss DLONG=0
   out/run_tests_cudss
 
-Currently cuDSS only supports 32 bit integers (for sparse matrix idicies) so
+Currently cuDSS only supports 32 bit integers (for sparse matrix indices) so
 :code:`DLONG=0` is mandatory (see `the docs of cuDSS CSR matrix
 <https://docs.nvidia.com/cuda/cudss/functions.html#cudssmatrixcreatecsr>`_).
 
@@ -181,4 +207,3 @@ To use the libraries in your own source code, compile your code with the linker
 option :code:`-L(PATH_TO_SCS_LIBS)` and :code:`-lscsdir` or :code:`-lscsindir`
 (as needed). The API and required data structures are defined in the file
 :code:`include/scs.h` and documented :ref:`here <c_interface>`.
-

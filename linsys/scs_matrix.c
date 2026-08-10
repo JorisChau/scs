@@ -1,21 +1,31 @@
 /* contains routines common to direct and indirect sparse solvers */
+
+/* ======================== Includes / Constants ======================== */
+
 #include "scs_matrix.h"
+#include "cones.h"
 #include "linalg.h"
 #include "linsys.h"
 #include "util.h"
+
+#include <string.h>
 
 #define MIN_NORMALIZATION_FACTOR (1e-4)
 #define MAX_NORMALIZATION_FACTOR (1e4)
 #define NUM_RUIZ_PASSES (25) /* additional passes don't help much */
 #define NUM_L2_PASSES (1)    /* do one or zero, not more since not stable */
 
+/* ======================== Matrix Copy / Free ======================== */
+
 scs_int SCS(copy_matrix)(ScsMatrix **dstp, const ScsMatrix *src) {
+  scs_int Anz;
+  ScsMatrix *A;
   if (!src) {
     *dstp = SCS_NULL;
     return 1;
   }
-  scs_int Anz = src->p[src->n];
-  ScsMatrix *A = (ScsMatrix *)scs_calloc(1, sizeof(ScsMatrix));
+  Anz = src->p[src->n];
+  A = (ScsMatrix *)scs_calloc(1, sizeof(ScsMatrix));
   if (!A) {
     return 0;
   }
@@ -28,6 +38,10 @@ scs_int SCS(copy_matrix)(ScsMatrix **dstp, const ScsMatrix *src) {
   /* A column pointer, size: n+1 */
   A->p = (scs_int *)scs_calloc(src->n + 1, sizeof(scs_int));
   if (!A->x || !A->i || !A->p) {
+    scs_free(A->x);
+    scs_free(A->i);
+    scs_free(A->p);
+    scs_free(A);
     return 0;
   }
   memcpy(A->x, src->x, sizeof(scs_float) * Anz);
@@ -35,66 +49,6 @@ scs_int SCS(copy_matrix)(ScsMatrix **dstp, const ScsMatrix *src) {
   memcpy(A->p, src->p, sizeof(scs_int) * (src->n + 1));
   *dstp = A;
   return 1;
-}
-
-scs_int SCS(validate_lin_sys)(const ScsMatrix *A, const ScsMatrix *P) {
-  scs_int i, j, r_max, Anz;
-  if (!A->x || !A->i || !A->p) {
-    scs_printf("data incompletely specified\n");
-    return -1;
-  }
-  /* detects some errors in A col ptrs: */
-  Anz = A->p[A->n];
-  /* Disable this check which is slowish and typically just produces noise. */
-  /*
-  if (Anz > 0) {
-    for (i = 0; i < A->n; ++i) {
-      if (A->p[i] == A->p[i + 1]) {
-        scs_printf("WARN: A->p (column pointers) not strictly increasing, "
-                   "column %li empty\n",
-                   (long)i);
-      } else if (A->p[i] > A->p[i + 1]) {
-        scs_printf("ERROR: A->p (column pointers) decreasing\n");
-        return -1;
-      }
-    }
-  }
-  */
-  if (((scs_float)Anz / A->m > A->n) || (Anz < 0)) {
-    scs_printf("Anz (nonzeros in A) = %li, outside of valid range\n",
-               (long)Anz);
-    return -1;
-  }
-  r_max = 0;
-  for (i = 0; i < Anz; ++i) {
-    if (A->i[i] > r_max) {
-      r_max = A->i[i];
-    }
-  }
-  if (r_max > A->m - 1) {
-    scs_printf("number of rows in A inconsistent with input dimension\n");
-    return -1;
-  }
-  if (P) {
-    if (P->n != A->n) {
-      scs_printf("P dimension = %li, inconsistent with n = %li\n", (long)P->n,
-                 (long)A->n);
-      return -1;
-    }
-    if (P->m != P->n) {
-      scs_printf("P is not square\n");
-      return -1;
-    }
-    for (j = 0; j < P->n; j++) { /* cols */
-      for (i = P->p[j]; i < P->p[j + 1]; i++) {
-        if (P->i[i] > j) { /* if row > */
-          scs_printf("P is not upper triangular\n");
-          return -1;
-        }
-      }
-    }
-  }
-  return 0;
 }
 
 void SCS(free_scs_matrix)(ScsMatrix *A) {
@@ -105,6 +59,172 @@ void SCS(free_scs_matrix)(ScsMatrix *A) {
     scs_free(A);
   }
 }
+
+/* ======================== Validation ======================== */
+
+scs_int SCS(validate_lin_sys)(const ScsMatrix *A, const ScsMatrix *P) {
+  scs_int i, j, Anz, Pnz;
+  if (!A) {
+    scs_printf("A matrix missing\n");
+    return -1;
+  }
+  if (A->m <= 0 || A->n <= 0) {
+    scs_printf("A matrix dimensions must be positive\n");
+    return -1;
+  }
+  if (!A->x || !A->i || !A->p) {
+    scs_printf("data incompletely specified\n");
+    return -1;
+  }
+  if (A->p[0] != 0) {
+    scs_printf("A->p[0] must equal 0\n");
+    return -1;
+  }
+  for (j = 0; j < A->n; ++j) {
+    if (A->p[j] < 0 || A->p[j] > A->p[j + 1]) {
+      scs_printf("A->p (column pointers) must be nonnegative and "
+                 "nondecreasing\n");
+      return -1;
+    }
+  }
+  Anz = A->p[A->n];
+  if (((scs_float)Anz / A->m > A->n) || (Anz < 0)) {
+    scs_printf("Anz (nonzeros in A) = %li, outside of valid range\n",
+               (long)Anz);
+    return -1;
+  }
+  for (i = 0; i < Anz; ++i) {
+    if (A->i[i] < 0 || A->i[i] >= A->m) {
+      scs_printf("A row index %li outside valid range [0, %li]\n",
+                 (long)A->i[i], (long)A->m - 1);
+      return -1;
+    }
+    if (!isfinite(A->x[i])) {
+      scs_printf("A contains a non-finite entry\n");
+      return -1;
+    }
+  }
+  if (P) {
+    if (!P->x || !P->i || !P->p) {
+      scs_printf("P matrix incompletely specified\n");
+      return -1;
+    }
+    if (P->n != A->n) {
+      scs_printf("P dimension = %li, inconsistent with n = %li\n", (long)P->n,
+                 (long)A->n);
+      return -1;
+    }
+    if (P->m != P->n) {
+      scs_printf("P is not square\n");
+      return -1;
+    }
+    if (P->p[0] != 0) {
+      scs_printf("P->p[0] must equal 0\n");
+      return -1;
+    }
+    for (j = 0; j < P->n; ++j) {
+      if (P->p[j] < 0 || P->p[j] > P->p[j + 1]) {
+        scs_printf("P->p (column pointers) must be nonnegative and "
+                   "nondecreasing\n");
+        return -1;
+      }
+    }
+    Pnz = P->p[P->n];
+    if (((scs_float)Pnz / P->m > P->n) || (Pnz < 0)) {
+      scs_printf("Pnz (nonzeros in P) = %li, outside of valid range\n",
+                 (long)Pnz);
+      return -1;
+    }
+    for (j = 0; j < P->n; j++) { /* cols */
+      for (i = P->p[j]; i < P->p[j + 1]; i++) {
+        if (P->i[i] < 0 || P->i[i] >= P->n) {
+          scs_printf("P row index %li outside valid range [0, %li]\n",
+                     (long)P->i[i], (long)P->n - 1);
+          return -1;
+        }
+        if (P->i[i] > j) { /* if row > */
+          scs_printf("P is not upper triangular\n");
+          return -1;
+        }
+        if (!isfinite(P->x[i])) {
+          scs_printf("P contains a non-finite entry\n");
+          return -1;
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+/* ======================== Matrix-Vector Products ======================== */
+
+void SCS(accum_by_atrans)(const ScsMatrix *A, const scs_float *x,
+                          scs_float *y) {
+  /* y += A'*x
+     A in column compressed format
+     parallelizes over columns (rows of A')
+   */
+  scs_int p, j;
+  scs_int c1, c2;
+  scs_float yj;
+  scs_int n = A->n;
+  scs_int *Ap = A->p;
+  scs_int *Ai = A->i;
+  scs_float *Ax = A->x;
+#ifdef _OPENMP
+#pragma omp parallel for private(p, c1, c2, yj)
+#endif
+  for (j = 0; j < n; j++) {
+    yj = y[j];
+    c1 = Ap[j];
+    c2 = Ap[j + 1];
+    for (p = c1; p < c2; p++) {
+      yj += Ax[p] * x[Ai[p]];
+    }
+    y[j] = yj;
+  }
+}
+
+void SCS(accum_by_a)(const ScsMatrix *A, const scs_float *x, scs_float *y) {
+  /*y += A*x
+    A in column compressed format
+    */
+  scs_int p, j, i;
+  scs_int n = A->n;
+  scs_int *Ap = A->p;
+  scs_int *Ai = A->i;
+  scs_float *Ax = A->x;
+  for (j = 0; j < n; j++) { /* col */
+    for (p = Ap[j]; p < Ap[j + 1]; p++) {
+      i = Ai[p]; /* row */
+      y[i] += Ax[p] * x[j];
+    }
+  }
+}
+
+/* Since P is upper triangular need to be clever here */
+void SCS(accum_by_p)(const ScsMatrix *P, const scs_float *x, scs_float *y) {
+  /* returns y += P x where P is stored upper triangular (CSC).
+   * Single pass: each stored entry (i,j) contributes to both y[i] (upper)
+   * and y[j] (symmetric lower), halving NNZ traversals vs two-pass approach. */
+  scs_int p, j;
+  scs_int n = P->n;
+  scs_int *Pp = P->p;
+  scs_int *Pi = P->i;
+  scs_float *Px = P->x;
+  for (j = 0; j < n; j++) {
+    for (p = Pp[j]; p < Pp[j + 1]; p++) {
+      scs_int i = Pi[p];
+      scs_float val = Px[p];
+      y[i] += val * x[j]; /* upper triangle + diagonal */
+      if (i != j) {
+        y[j] += val * x[i]; /* symmetric lower triangle */
+      }
+    }
+  }
+}
+
+/* ======================== Normalization Internals ======================== */
 
 static inline scs_float apply_limit(scs_float x) {
   /* need to bound to 1 for cols/rows of all zeros, otherwise blows up */
@@ -117,7 +237,6 @@ static void compute_ruiz_mats(ScsMatrix *P, ScsMatrix *A, scs_float *Dt,
                               scs_float *Et, ScsConeWork *cone) {
   scs_int i, j, kk;
   scs_float wrk;
-  scs_float nm_a_col;
 
   /****************************  D  ****************************/
 
@@ -169,9 +288,14 @@ static void compute_ruiz_mats(ScsMatrix *P, ScsMatrix *A, scs_float *Dt,
     }
   }
 
-  /* calculate col norms, E */
+  /* calculate col norms, E — inline the norm_inf to avoid n BLAS call
+   * overheads (Fortran ABI, pointer args, 1-based return) for short cols. */
   for (i = 0; i < A->n; ++i) {
-    nm_a_col = SCS(norm_inf)(&(A->x[A->p[i]]), A->p[i + 1] - A->p[i]);
+    scs_float nm_a_col = 0.0, tmp;
+    for (j = A->p[i]; j < A->p[i + 1]; ++j) {
+      tmp = ABS(A->x[j]);
+      if (tmp > nm_a_col) nm_a_col = tmp;
+    }
     Et[i] = MAX(Et[i], nm_a_col);
     Et[i] = SQRTF(apply_limit(Et[i]));
     Et[i] = SAFEDIV_POS(1.0, Et[i]);
@@ -246,28 +370,22 @@ static void compute_l2_mats(ScsMatrix *P, ScsMatrix *A, scs_float *Dt,
 static void rescale(ScsMatrix *P, ScsMatrix *A, scs_float *Dt, scs_float *Et,
                     ScsScaling *scal, ScsConeWork *cone) {
   scs_int i, j;
-  /* scale the rows of A with D */
+  /* Fuse row and col scaling of A: A[i,j] *= Dt[i] * Et[j].
+   * Single NNZ pass replaces two separate passes. */
   for (i = 0; i < A->n; ++i) {
+    scs_float ei = Et[i];
     for (j = A->p[i]; j < A->p[i + 1]; ++j) {
-      A->x[j] *= Dt[A->i[j]];
+      A->x[j] *= Dt[A->i[j]] * ei;
     }
-  }
-
-  /* scale the cols of A with E */
-  for (i = 0; i < A->n; ++i) {
-    SCS(scale_array)(&(A->x[A->p[i]]), Et[i], A->p[i + 1] - A->p[i]);
   }
 
   if (P) {
-    /* scale the rows of P with E */
+    /* Fuse row and col scaling of P: P[i,j] *= Et[i] * Et[j]. */
     for (i = 0; i < P->n; ++i) {
+      scs_float ei = Et[i];
       for (j = P->p[i]; j < P->p[i + 1]; ++j) {
-        P->x[j] *= Et[P->i[j]];
+        P->x[j] *= Et[P->i[j]] * ei;
       }
-    }
-    /* scale the cols of P with E */
-    for (i = 0; i < P->n; ++i) {
-      SCS(scale_array)(&(P->x[P->p[i]]), Et[i], P->p[i + 1] - P->p[i]);
     }
   }
 
@@ -287,6 +405,8 @@ static void rescale(ScsMatrix *P, ScsMatrix *A, scs_float *Dt, scs_float *Et,
   }
   */
 }
+
+/* ======================== Normalization Public API ======================== */
 
 /* Will rescale as P -> EPE, A -> DAE in-place.
  * Essentially trying to rescale this matrix:
@@ -315,8 +435,22 @@ ScsScaling *SCS(normalize_a_p)(ScsMatrix *P, ScsMatrix *A, ScsConeWork *cone) {
   ScsScaling *scal = (ScsScaling *)scs_calloc(1, sizeof(ScsScaling));
   scs_float *Dt = (scs_float *)scs_calloc(A->m, sizeof(scs_float));
   scs_float *Et = (scs_float *)scs_calloc(A->n, sizeof(scs_float));
+  if (!scal || !Dt || !Et) {
+    scs_free(scal);
+    scs_free(Dt);
+    scs_free(Et);
+    return SCS_NULL;
+  }
   scal->D = (scs_float *)scs_calloc(A->m, sizeof(scs_float));
   scal->E = (scs_float *)scs_calloc(A->n, sizeof(scs_float));
+  if (!scal->D || !scal->E) {
+    scs_free(scal->D);
+    scs_free(scal->E);
+    scs_free(scal);
+    scs_free(Dt);
+    scs_free(Et);
+    return SCS_NULL;
+  }
 
 #if VERBOSITY > 5
   SCS(timer) normalize_timer;
@@ -359,97 +493,4 @@ ScsScaling *SCS(normalize_a_p)(ScsMatrix *P, ScsMatrix *A, ScsConeWork *cone) {
   scs_printf("norm E %g\n", SCS(norm_inf)(scal->E, A->n));
 #endif
   return scal;
-}
-
-/*
-void SCS(un_normalize_a_p)(ScsMatrix *A, ScsMatrix *P, const ScsScaling *scal) {
-  scs_int i, j;
-  scs_float *D = scal->D;
-  scs_float *E = scal->E;
-  for (i = 0; i < A->n; ++i) {
-    SCS(scale_array)
-    (&(A->x[A->p[i]]), 1. / E[i], A->p[i + 1] - A->p[i]);
-  }
-  for (i = 0; i < A->n; ++i) {
-    for (j = A->p[i]; j < A->p[i + 1]; ++j) {
-      A->x[j] /= D[A->i[j]];
-    }
-  }
-  if (P) {
-    for (i = 0; i < P->n; ++i) {
-      SCS(scale_array)
-      (&(P->x[P->p[i]]), 1. / E[i], P->p[i + 1] - P->p[i]);
-    }
-    for (i = 0; i < P->n; ++i) {
-      for (j = P->p[i]; j < P->p[i + 1]; ++j) {
-        P->x[j] /= E[P->i[j]];
-      }
-    }
-  }
-}
-*/
-
-void SCS(accum_by_atrans)(const ScsMatrix *A, const scs_float *x,
-                          scs_float *y) {
-  /* y += A'*x
-     A in column compressed format
-     parallelizes over columns (rows of A')
-   */
-  scs_int p, j;
-  scs_int c1, c2;
-  scs_float yj;
-  scs_int n = A->n;
-  scs_int *Ap = A->p;
-  scs_int *Ai = A->i;
-  scs_float *Ax = A->x;
-#ifdef _OPENMP
-#pragma omp parallel for private(p, c1, c2, yj)
-#endif
-  for (j = 0; j < n; j++) {
-    yj = y[j];
-    c1 = Ap[j];
-    c2 = Ap[j + 1];
-    for (p = c1; p < c2; p++) {
-      yj += Ax[p] * x[Ai[p]];
-    }
-    y[j] = yj;
-  }
-}
-
-void SCS(accum_by_a)(const ScsMatrix *A, const scs_float *x, scs_float *y) {
-  /*y += A*x
-    A in column compressed format
-    */
-  scs_int p, j, i;
-  scs_int n = A->n;
-  scs_int *Ap = A->p;
-  scs_int *Ai = A->i;
-  scs_float *Ax = A->x;
-  for (j = 0; j < n; j++) { /* col */
-    for (p = Ap[j]; p < Ap[j + 1]; p++) {
-      i = Ai[p]; /* row */
-      y[i] += Ax[p] * x[j];
-    }
-  }
-}
-
-/* Since P is upper triangular need to be clever here */
-void SCS(accum_by_p)(const ScsMatrix *P, const scs_float *x, scs_float *y) {
-  /* returns y += P x */
-  scs_int p, j, i;
-  scs_int n = P->n;
-  scs_int *Pp = P->p;
-  scs_int *Pi = P->i;
-  scs_float *Px = P->x;
-  /* y += P_upper x but skip diagonal entries*/
-  for (j = 0; j < n; j++) { /* col */
-    for (p = Pp[j]; p < Pp[j + 1]; p++) {
-      i = Pi[p];    /* row */
-      if (i != j) { /* skip the diagonal */
-        y[i] += Px[p] * x[j];
-      }
-    }
-  }
-  /* y += P_lower x */
-  SCS(accum_by_atrans)(P, x, y);
 }

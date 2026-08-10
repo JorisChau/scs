@@ -17,6 +17,15 @@ You can also install directly from source
   cd scs-python
   python -m pip install .
 
+Apple Accelerate (macOS)
+""""""""""""""""""""""""
+
+On macOS the Apple Accelerate backend is built and included automatically —
+no extra install flags are needed. It uses the Accelerate framework's sparse
+LDL\ :sup:`T` solver, which is optimized for Apple hardware including Apple
+Silicon. See :ref:`here <python_interface>` for how to select Accelerate when
+solving.
+
 MKL
 """
 
@@ -28,6 +37,24 @@ If you have MKL, you can install the MKL Pardiso interface using
 
 See :ref:`here <python_interface>` for how to enable MKL when solving. MKL is
 typically faster than the built-in linear system solver.
+
+The published Linux x86_64 wheels prefer the threaded MKL variant and include
+the Intel OpenMP runtime (:code:`libiomp5`). Windows currently falls back to
+sequential MKL until Intel fixes the threaded :code:`pkg-config` metadata in
+its conda packages.
+
+To use 64-bit BLAS/LAPACK integers (ILP64 / :code:`BLAS64`) with any supported
+BLAS/LAPACK library, install with:
+
+.. code:: bash
+
+  python -m pip install -Csetup-args=-Duse_blas64=true .
+
+If you combine :code:`BLAS64` with the MKL Pardiso backend, SCS requires
+64-bit SCS integers as well (the default in the Meson build). At runtime SCS
+also checks that the process-wide MKL interface layer matches the LP64/ILP64
+mode it was compiled for, and fails early if another library already set an
+incompatible MKL interface.
 
 GPU
 """
@@ -44,6 +71,21 @@ sparse direct GPU solver is typically very fast.
 
 See `here <https://colab.research.google.com/drive/1POCgDNFg8fycHMI9T9N6V3iHFhXRthjn?usp=sharing>`_ for an example colab where the cuDSS version of SCS, along with
 required dependencies, is installed and used.
+
+.. _python_spectral_install:
+
+Spectral cones
+""""""""""""""
+
+To enable :ref:`spectral cone <spectral_cones>` support (log-determinant,
+nuclear norm, :math:`\ell_1` norm, sum-of-largest-eigenvalues), install with:
+
+.. code:: bash
+
+  python -m pip install -Csetup-args=-Duse_spectral_cones=true .
+
+This requires LAPACK (enabled by default). See
+:ref:`python_spectral_cone_keys` for the cone dict keys.
 
 Testing
 """""""
@@ -70,4 +112,3 @@ You can install the GPU indirect solver using
 .. code:: bash
 
   python legacy_setup.py install --scs --gpu
-

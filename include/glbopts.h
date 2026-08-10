@@ -1,3 +1,12 @@
+/*
+ * Global options, default parameter values, and platform-specific macros.
+ *
+ * Defines printing/memory allocation macros (adapts to MATLAB, Python, R),
+ * math precision macros (float vs double), default solver constants, and
+ * internal algorithm tuning parameters. This is an internal header; the
+ * public API is in scs.h.
+ */
+
 #ifndef GLB_H_GUARD
 #define GLB_H_GUARD
 
@@ -74,10 +83,27 @@ extern "C" {
 /* redefine memory allocators as needed */
 #ifdef MATLAB_MEX_FILE
 #include "mex.h"
+/* Use mexMakeMemoryPersistent so allocations survive across MEX calls.
+ * Required for the workspace API (scs_init/scs_solve/scs_finish). */
+static inline void *_scs_mex_malloc(size_t n) {
+  void *p = mxMalloc(n);
+  if (p) mexMakeMemoryPersistent(p);
+  return p;
+}
+static inline void *_scs_mex_calloc(size_t count, size_t size) {
+  void *p = mxCalloc(count, size);
+  if (p) mexMakeMemoryPersistent(p);
+  return p;
+}
+static inline void *_scs_mex_realloc(void *ptr, size_t n) {
+  void *p = mxRealloc(ptr, n);
+  if (p) mexMakeMemoryPersistent(p);
+  return p;
+}
 #define scs_free mxFree
-#define scs_malloc mxMalloc
-#define scs_calloc mxCalloc
-#define scs_realloc mxRealloc
+#define scs_malloc _scs_mex_malloc
+#define scs_calloc _scs_mex_calloc
+#define scs_realloc _scs_mex_realloc
 #elif defined PYTHON
 #include <Python.h>
 #if PY_MAJOR_VERSION >= 3
@@ -113,17 +139,17 @@ static inline void *scs_calloc(size_t count, size_t size) {
 
 #ifndef SFLOAT
 #ifndef NAN
-#define NAN ((scs_float)0x7ff8000000000000)
+#define NAN (HUGE_VAL - HUGE_VAL)
 #endif
 #ifndef INFINITY
-#define INFINITY NAN
+#define INFINITY HUGE_VAL
 #endif
 #else
 #ifndef NAN
-#define NAN ((float)0x7fc00000)
+#define NAN ((float)(HUGE_VAL - HUGE_VAL))
 #endif
 #ifndef INFINITY
-#define INFINITY NAN
+#define INFINITY ((float)HUGE_VAL)
 #endif
 #endif
 
@@ -155,12 +181,14 @@ static inline void *scs_calloc(size_t count, size_t size) {
 #define IABS abs
 #endif
 
-/* Force SCS to treat the problem as (non-homogeneous) feasible for this many */
-/* iters. This acts like a warm-start that biases towards feasibility, which */
-/* is the most common use-case */
+/* Force SCS to treat the problem as (non-homogeneous) feasible for this many
+ * iterations. Acts like an implicit warm-start biased towards feasibility,
+ * which is the most common use-case. During these iterations tau is fixed
+ * at 1 and kappa is fixed at 0. */
 #define FEASIBLE_ITERS (1)
 
-/* how many iterations between heuristic residual rescaling */
+/* Minimum iterations between heuristic scale updates. Prevents scale
+ * from changing too frequently before the iterates have stabilized. */
 #define RESCALING_MIN_ITERS (100)
 
 #define _DIV_EPS_TOL (1E-18)
@@ -185,30 +213,40 @@ static inline void *scs_calloc(size_t count, size_t size) {
 /* #define NORM SCS(norm_2) */
 #define NORM SCS(norm_inf)
 
-/* Factor which is scales tau in the linear system update */
-/* Larger factors prevent tau from moving as much */
+/* Factor which scales the tau diagonal entry in the linear system.
+ * Larger values stabilize tau but slow convergence. 10 is a good balance
+ * for most problems. */
 #define TAU_FACTOR (10.)
 
-/* Anderson acceleration parameters: */
+/* --- Anderson Acceleration (AA) parameters --- */
+/* Default AA type: 1 = type-I (better empirical performance, default),
+ * 0 = type-II (more numerically stable but typically slower). */
+#define ACCELERATION_TYPE_1 (1)
+/* Default Tikhonov regularization for the AA least-squares solve. Tuned
+ * for type-I; type-II tolerates much smaller (e.g. 1e-12). Users picking
+ * type-II will typically lower this. */
+#define AA_REGULARIZATION (1e-8)
 #define AA_RELAXATION (1.0)
-#define AA_REGULARIZATION_TYPE_1 (1e-6)
-#define AA_REGULARIZATION_TYPE_2 (1e-10)
-/* Safeguarding norm factor at which we reject AA steps */
+/* Reject AA steps when the output norm exceeds this multiple of the input
+ * norm. 1.0 means the AA step must not increase the iterate norm. */
 #define AA_SAFEGUARD_FACTOR (1.)
-/* Max allowable AA weight norm */
+/* Reject AA steps whose weight vector exceeds this norm (prevents
+ * numerically unstable extrapolation). */
 #define AA_MAX_WEIGHT_NORM (1e10)
+/* Max iterative-refinement passes on the γ solve. 0 disables IR; the loop
+ * auto-stops once the correction no longer contracts, so this is an upper
+ * bound rather than a fixed iteration count. */
+#define AA_IR_MAX_STEPS (5)
 
 /* (Dual) Scale updating parameters */
 #define MAX_SCALE_VALUE (1e6)
 #define MIN_SCALE_VALUE (1e-6)
 #define SCALE_NORM NORM /* what norm to use when computing the scale factor */
 
-/* CG == Conjugate gradient */
-/* Linear system tolerances, only used with indirect */
+/* --- Conjugate gradient (CG) parameters, only used with indirect solver --- */
 #define CG_BEST_TOL (1e-12)
-/* This scales the current residuals to get the tolerance we solve the
- * linear system to at each iteration. Lower factors require more CG steps
- * but give better accuracy */
+/* Each CG solve targets tol = CG_TOL_FACTOR * current_residual. Smaller
+ * values give more accurate CG solves at the cost of more CG iterations. */
 #define CG_TOL_FACTOR (0.2)
 
 /* norm to use when deciding CG convergence */

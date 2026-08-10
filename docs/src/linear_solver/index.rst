@@ -51,6 +51,23 @@ factorization.  It relies on the external (but included) `AMD
 <https://github.com/DrTimothyAldenDavis/SuiteSparse>`_ and `QDLDL
 <https://github.com/oxfordcontrol/qdldl>`_ packages.
 
+.. _dense:
+
+Dense direct
+^^^^^^^^^^^^
+
+The dense direct method reduces the KKT system to the smaller Gram matrix
+:math:`G = R_x + P + A^\top R_y^{-1} A` (size :math:`n \times n`) and
+factorizes it using the LAPACK ``dpotrf`` (Cholesky) routine. The
+:math:`A^\top R_y^{-1} A` product is computed via ``dsyrk`` and subsequent
+solves use ``dpotrs``. When the diagonal :math:`R` changes, the Gram matrix is
+re-formed and re-factorized.
+
+This backend is best suited for small to medium-sized problems where the
+constraint matrix :math:`A` is dense. For such problems, dense BLAS/LAPACK
+routines can outperform sparse solvers due to highly optimized memory access
+patterns and lower overhead. It requires LAPACK (``USE_LAPACK=1``).
+
 .. _mkl:
 
 MKL Pardiso
@@ -67,6 +84,36 @@ Intel MKL is now available for
 `free and without restrictions for everyone <https://www.intel.com/content/www/us/en/developer/articles/news/free-ipsxe-tools-and-libraries.html>`_,
 though it only offers limited support for non-Intel CPUs.
 
+.. _apple_accelerate:
+
+Apple Accelerate
+^^^^^^^^^^^^^^^^
+
+The Apple `Accelerate
+<https://developer.apple.com/documentation/accelerate>`_ framework provides
+a sparse LDL\ :sup:`T` factorization that is optimized for Apple hardware
+(including Apple Silicon). This backend uses the unpivoted LDL\ :sup:`T`
+solver from the Accelerate Sparse Solvers API, which is well-suited for the
+quasi-definite KKT systems that SCS produces. Accelerate performs its own
+fill-reducing ordering internally so no external AMD package is needed.
+
+This backend is macOS-only and is available without installing any additional
+libraries since the Accelerate framework ships with Xcode / the macOS SDK.
+It does not support 64-bit integer indexing (``DLONG``).
+
+To build with Make::
+
+    make accelerate
+
+To build with CMake::
+
+    cmake -DUSE_APPLE_ACCELERATE=ON ..
+
+In Python, the Accelerate backend is included automatically on macOS
+(``pip install scs`` is sufficient). Select it at solve time::
+
+    solver = scs.SCS(data, cone, apple_ldl=True)
+
 .. _indirect:
 
 Sparse indirect
@@ -77,10 +124,8 @@ The indirect method solves the above linear system approximately with a
 
 .. math::
 
-  \begin{align}
   (R_x + P + A^\top R_y^{-1} A) x & = z^k_x + A^\top R_y^{-1} z^k_y \\
                             y & = R_y^{-1}(A x - z^k_y).
-  \end{align}
 
 then solves the positive definite system using using `conjugate gradients
 <https://en.wikipedia.org/wiki/Conjugate_gradient_method>`_.  Each iteration of

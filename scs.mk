@@ -4,10 +4,8 @@ else
 UNAME = $(shell uname -s)
 endif
 
-# CC = clang -fsanitize=address -fsanitize=undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow
-# For cross-compiling with mingw use these.
-#CC = i686-w64-mingw32-gcc -m32
-#CC = x86_64-w64-mingw32-gcc-4.8
+# To enable sanitizers or cross-compile, override CC on the command line:
+#   make CC="clang -fsanitize=address,undefined"
 
 # For GPU must add cuda libs to path, e.g.
 # export DYLD_LIBRARY_PATH=/usr/local/cuda/lib:$DYLD_LIBRARY_PATH
@@ -43,13 +41,13 @@ SHARED = dll
 SONAME = -soname
 else
 # we're on a linux system, use accurate timer provided by clock_gettime()
-LDFLAGS += -lm -lrt
+LDFLAGS += -lm -lrt -lpthread
 SHARED = so
 SONAME = -soname
 endif
 endif
 
-#TODO: check if this works for all platforms:
+# Default CUDA path; override with CUDA_PATH=/path/to/cuda
 ifeq ($(CUDA_PATH), )
 CUDA_PATH=/usr/local/cuda
 CUCC = $(CUDA_PATH)/bin/nvcc
@@ -61,8 +59,9 @@ CUDAFLAGS = $(CFLAGS) -I$(CUDA_PATH)/include -Ilinsys/gpu -Wno-c++11-long-long #
 CUDSS_FLAGS = -I$(CUDSS_PATH)/include -I$(CUDA_PATH)/include
 CUDSS_LDFLAGS = $(CULDFLAGS) -L$(CUDSS_PATH)/lib -lcudss
 
-# Add on default CFLAGS
-OPT = -O3
+# Default optimization flags. Override with OPT="-O3 -g" for valgrind, which
+# may not support instruction sets enabled by -march=native.
+OPT ?= -O3 -march=native -fno-math-errno
 INCLUDE = -I. -Iinclude -Ilinsys
 override CFLAGS += -g -Wall -Wwrite-strings -pedantic -funroll-loops -Wstrict-prototypes $(INCLUDE) $(OPT) -Werror=incompatible-pointer-types
 ifneq ($(ISWINDOWS), 1)
@@ -72,10 +71,12 @@ endif
 LINSYS = linsys
 DIRSRC = $(LINSYS)/cpu/direct
 INDIRSRC = $(LINSYS)/cpu/indirect
+DENSESRC = $(LINSYS)/cpu/dense
 GPUDIR = $(LINSYS)/gpu/direct
 GPUINDIR = $(LINSYS)/gpu/indirect
 MKLSRC = $(LINSYS)/mkl/direct
 CUDSSSRC = $(LINSYS)/cudss/direct
+ACCELSRC = $(LINSYS)/accelerate/direct
 
 EXTSRC = $(LINSYS)/external
 
@@ -124,7 +125,7 @@ CUSTOM_FLAGS += -DNO_PRINTING=$(NO_PRINTING) # disable printing
 endif
 NO_READ_WRITE = 0
 ifneq ($(NO_READ_WRITE), 0)
-CUSTOM_FLAGS += -DNO_READ_WRITE=$(NO_READ_WRITE) # disable printing
+CUSTOM_FLAGS += -DNO_READ_WRITE=$(NO_READ_WRITE) # disable read/write (file I/O)
 endif
 ### VERBOSITY LEVELS: 0,1,2,...
 VERBOSITY = 0
@@ -136,10 +137,20 @@ ifneq ($(COVERAGE), 0)
 CUSTOM_FLAGS += --coverage # generate test coverage data
 endif
 
-# See: https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
-# This is probably not correct for other systems. TODO: update this
-# to work for all combinations of platform / compiler / threading options.
-MKLFLAGS = -L$(MKLROOT) -L$(MKLROOT)/lib -Wl,--no-as-needed -lmkl_rt -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -ldl
+# MKL linker flags for Linux + GCC + GNU threading. For other platforms, see:
+# https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl-link-line-advisor.html
+#
+# We link against mkl_rt (the single dynamic library) which dispatches to the
+# correct interface layer at runtime. The BLAS integer width (LP64 vs ILP64)
+# is set at startup by the MKL-specific path in src/scs.c, controlled by the
+# BLAS64 compile flag.
+#
+# Note: The PARDISO integer width (pardiso vs pardiso_64) is controlled by DLONG,
+# not by the MKL interface layer. See linsys/mkl/direct/private.c for details.
+# OMPROOT should point to the Intel OpenMP (iomp5) installation, typically
+# /opt/intel/oneapi/compiler/latest. If unset, fall back to MKLROOT.
+OMPROOT ?= $(MKLROOT)
+MKLFLAGS = -L$(MKLROOT)/lib -L$(MKLROOT)/lib/intel64 -L$(OMPROOT)/lib -Wl,--no-as-needed -lmkl_rt -liomp5 -lpthread -ldl
 
 ############ OPENMP: ############
 # set USE_OPENMP = 1 to allow openmp (multi-threaded matrix multiplies):

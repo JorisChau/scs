@@ -1,9 +1,18 @@
 /*
- * Define ScsWork and related internal-only structs (not part of external API).
+ * Internal workspace structs used during the solve.
+ *
+ * ScsWork holds all mutable state for one solve: ADMM iterates, residuals,
+ * normalization data, and pointers to the linear system and cone workspaces.
+ * ScsScaling holds the diagonal matrices from Ruiz equilibration.
+ * ScsResiduals tracks primal/dual residuals and infeasibility certificates.
+ *
+ * These are internal to SCS -- the public API is in scs.h.
  */
 
 #ifndef SCS_WORK_H_GUARD
 #define SCS_WORK_H_GUARD
+
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,6 +69,7 @@ struct SCS_WORK {
   ScsData *d;                     /* Problem data deep copy NORMALIZED */
   ScsCone *k;                     /* Problem cone deep copy */
   ScsSettings *stgs;      /* contains solver settings specified by user */
+  FILE *log_csv_fout;     /* open CSV log stream for current solve */
   ScsLinSysWork *p;       /* struct populated by linear system solver */
   ScsScaling *scal;       /* contains the re-scaling data */
   ScsConeWork *cone_work; /* workspace for the cone projection step */

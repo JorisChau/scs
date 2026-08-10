@@ -79,12 +79,10 @@ Y_k)^{-1}Y_k^\top g_k`, and hence by the relation between :math:`\alpha^k` and
 :math:`\gamma^k`, the next iterate of type-II AA can be written as
 
 .. math::
-  \begin{align}
   x^{k+1}&=f(x^k)-\sum_{i=0}^{m_k-1}\gamma_i^k\left(f(x^{k-m_k+i+1})- f(x^{k-m_k+i})\right)\\
   &=x^k-g_k-(S_k-Y_k)\gamma^k\\
   &=x^k-(I+(S_k-Y_k)(Y_k^\top Y_k)^{-1}Y_k^\top )g_k\\
   &=x^k-B_kg_k,
-  \end{align}
 
 where :math:`S_k=[s_{k-m_k}~\dots~s_{k-1}]`, :math:`s_i=x^{i+1}-x^i` for each
 :math:`i`, and
@@ -131,13 +129,16 @@ In SCS
 
 In SCS both types of acceleration are available, though by default type-I is
 used since it tends to have better performance.  If you wish to use AA then set
-the :code:`acceleration_lookback` setting to a non-zero value (10 works well for
+the :code:`acceleration_lookback` setting to a positive value (10 works well for
 many problems and is the default). This setting corresponds to :math:`m`, the
 maximum number of SCS iterates that AA will use to extrapolate to the new point.
+Set :code:`acceleration_lookback` to :code:`0` to disable AA entirely.
 
-To enable type-II acceleration then set :code:`acceleration_lookback` to a
-negative value, the sign is interpreted as switching the AA type (this is mostly
-so that we can test it without fully exposing it the user).
+To select type-II acceleration set :code:`acceleration_type_1` to :code:`0`
+(the default :code:`1` selects type-I). Type-II is more numerically stable than
+type-I but typically slower; users switching to type-II usually also lower
+:code:`acceleration_regularization` (e.g. :code:`1e-12`) since the default is
+tuned for type-I.
 
 The setting :code:`acceleration_interval` controls how frequently AA is applied.
 If :code:`acceleration_interval` :math:`=k` for some integer :math:`k \geq 1`
@@ -148,9 +149,20 @@ numerical stability by 'decorrelating' the data. On the other hand, older
 iterates might be stale.  More work is needed to determine the optimal setting
 for this parameter, but 10 appears to work well in practice and is the default.
 
-The details about how the linear systems are solved and updated is abstracted
-away into the AA package (eg, QR decomposition, SVD decomposition etc). Exactly
-how best to solve and update the equations is still open.
+The details about how the linear systems are solved and updated are abstracted
+away into the AA package. The current implementation uses a rank-revealing
+pivoted QR factorization (LAPACK :code:`geqp3`) of the augmented matrix (with
+Tikhonov regularization folded in as extra rows), followed by rank truncation
+and a few steps of iterative refinement on the :math:`\gamma` solve. This
+keeps the update stable as the :math:`S` and :math:`Y` columns become nearly
+linearly dependent near convergence. An SVD-based solve would be similarly
+rank-revealing but is substantially more expensive per iteration and has not
+been benchmarked here.
+
+SCS reports detailed AA solve diagnostics in the :code:`aa_stats` field of the
+returned :ref:`info` object. These include solve acceptances, rejection causes,
+the rank of the most recent AA solve, the most recent AA weight norm, and the
+regularization used in that solve.
 
 Regularization
 """"""""""""""
@@ -176,6 +188,10 @@ reduces to :math:`x^{k+1} = f(x^k)`. Note that the regularization can be folded
 into the matrices by appending :math:`\sqrt{\epsilon} I` to the bottom of
 :math:`S_k` or :math:`Y_k`, which is useful when using a QR or SVD decomposition
 to solve the equations.
+
+The setting :code:`acceleration_regularization` controls :math:`\epsilon`. The
+default (:code:`1e-8`) is tuned for type-I; type-II is typically run with a
+smaller value such as :code:`1e-12`.
 
 Max :math:`\gamma` norm
 """""""""""""""""""""""
@@ -211,8 +227,9 @@ replaces the final step of AA by mixing the map inputs and outputs as follows:
 .. math::
   x^{k+1} = \beta \sum_{j=0}^{m_k}\alpha_j^k f(x^{k-m_k+j}) + (1-\beta) \sum_{j=0}^{m_k}\alpha_j^k x^{k-m_k+j}
 
-where :math:`\beta` is the :code:`relaxation` parameter, and :math:`\beta=1`
-recovers vanilla AA. This can be computed using the matrices defined above using
+where :math:`\beta` is the :code:`acceleration_relaxation` parameter, and
+:math:`\beta=1` recovers vanilla AA. This can be computed using the matrices
+defined above using
 
 .. math::
   x^{k+1} = \beta (f(x^k) - (S_k - Y_k) \gamma^k) + (1-\beta) (x^k - S_k \gamma^k)
