@@ -629,7 +629,6 @@ static scs_int set_up_cone_work_spaces(ScsConeWork *c, const ScsCone *k) {
   /* Max dim for eigenvalues (e) and integer work (isuppz) */
   blas_int n_max = 1;
   blas_int n_max_real = 1; /* Max dim for Real PSD matrix (Xs) */
-  blas_int n_max_csd = 1;  /* Max dim for Complex PSD matrix (cXs) */
 
   /* LAPACK Query Variables */
   blas_int neg_one = -1, info = 0, m = 0;
@@ -637,9 +636,6 @@ static scs_int set_up_cone_work_spaces(ScsConeWork *c, const ScsCone *k) {
   scs_float d_f = 0.0, abstol = -1.0;
   scs_float wkopt = 0.0;
   blas_int iwkopt = 0;
-  scs_complex_float lcwork_opt = {0.0};
-  scs_float lrwork_opt = 0.0;
-  blas_int liwork_opt_c = 0;
 
   /* Max workspace sizes across all cone types */
   blas_int lwork_max = 0;
@@ -651,6 +647,11 @@ static scs_int set_up_cone_work_spaces(ScsConeWork *c, const ScsCone *k) {
     n_max_real = MAX(n_max_real, (blas_int)k->s[i]);
   }
 #ifdef USE_CSD_CONE
+  blas_int n_max_csd = 1; /* Max dim for Complex PSD matrix (cXs) */
+  scs_complex_float lcwork_opt = {0.0};
+  scs_float lrwork_opt = 0.0;
+  blas_int liwork_opt_c = 0;
+
   for (i = 0; i < k->cssize; ++i) {
     n_max = MAX(n_max, (blas_int)k->cs[i]);
     n_max_csd = MAX(n_max_csd, (blas_int)k->cs[i]);
