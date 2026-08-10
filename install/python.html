@@ -1,0 +1,233 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Python &mdash; SCS 3.2.11 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/scs_theme.css?v=7d28eb0c" />
+
+  
+    <link rel="shortcut icon" href="../_static/favicon.ico"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=537ea5e8"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="MATLAB" href="matlab.html" />
+    <link rel="prev" title="C / C++" href="c.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html">
+            
+              <img src="../_static/scs_logo_transparent.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../algorithm/index.html">Algorithm</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/index.html">API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Install</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="c.html">C / C++</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Python</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#apple-accelerate-macos">Apple Accelerate (macOS)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#mkl">MKL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#gpu">GPU</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#spectral-cones">Spectral cones</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#testing">Testing</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#legacy-options">Legacy options</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="matlab.html">MATLAB</a></li>
+<li class="toctree-l2"><a class="reference internal" href="julia.html">Julia</a></li>
+<li class="toctree-l2"><a class="reference internal" href="r.html">R</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ruby.html">Ruby</a></li>
+<li class="toctree-l2"><a class="reference internal" href="javascript.html">JavaScript / WebAssembly</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../linear_solver/index.html">Linear System Solver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../blas_lapack/index.html">BLAS and LAPACK</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/index.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../help/index.html">Help</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citing/index.html">Citing SCS</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">SCS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Install</a></li>
+      <li class="breadcrumb-item active">Python</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/install/python.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="python">
+<span id="python-install"></span><h1>Python<a class="headerlink" href="#python" title="Link to this heading"></a></h1>
+<p>The easiest way to install the python version is using <a class="reference external" href="https://pypi.org/project/pip/">pip</a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>scs
+</pre></div>
+</div>
+<p>You can also install directly from source</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>--recursive<span class="w"> </span>https://github.com/bodono/scs-python.git
+<span class="nb">cd</span><span class="w"> </span>scs-python
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>.
+</pre></div>
+</div>
+<section id="apple-accelerate-macos">
+<h2>Apple Accelerate (macOS)<a class="headerlink" href="#apple-accelerate-macos" title="Link to this heading"></a></h2>
+<p>On macOS the Apple Accelerate backend is built and included automatically —
+no extra install flags are needed. It uses the Accelerate framework’s sparse
+LDL<sup>T</sup> solver, which is optimized for Apple hardware including Apple
+Silicon. See <a class="reference internal" href="../api/python.html#python-interface"><span class="std std-ref">here</span></a> for how to select Accelerate when
+solving.</p>
+</section>
+<section id="mkl">
+<h2>MKL<a class="headerlink" href="#mkl" title="Link to this heading"></a></h2>
+<p>If you have MKL, you can install the MKL Pardiso interface using</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-Csetup-args<span class="o">=</span>-Dlink_mkl<span class="o">=</span><span class="nb">true</span><span class="w"> </span>.
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="../api/python.html#python-interface"><span class="std std-ref">here</span></a> for how to enable MKL when solving. MKL is
+typically faster than the built-in linear system solver.</p>
+<p>The published Linux x86_64 wheels prefer the threaded MKL variant and include
+the Intel OpenMP runtime (<code class="code docutils literal notranslate"><span class="pre">libiomp5</span></code>). Windows currently falls back to
+sequential MKL until Intel fixes the threaded <code class="code docutils literal notranslate"><span class="pre">pkg-config</span></code> metadata in
+its conda packages.</p>
+<p>To use 64-bit BLAS/LAPACK integers (ILP64 / <code class="code docutils literal notranslate"><span class="pre">BLAS64</span></code>) with any supported
+BLAS/LAPACK library, install with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-Csetup-args<span class="o">=</span>-Duse_blas64<span class="o">=</span><span class="nb">true</span><span class="w"> </span>.
+</pre></div>
+</div>
+<p>If you combine <code class="code docutils literal notranslate"><span class="pre">BLAS64</span></code> with the MKL Pardiso backend, SCS requires
+64-bit SCS integers as well (the default in the Meson build). At runtime SCS
+also checks that the process-wide MKL interface layer matches the LP64/ILP64
+mode it was compiled for, and fails early if another library already set an
+incompatible MKL interface.</p>
+</section>
+<section id="gpu">
+<h2>GPU<a class="headerlink" href="#gpu" title="Link to this heading"></a></h2>
+<p>If you have a GPU and cuDSS installed you can install the GPU direct sparse
+solver using</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-Csetup-args<span class="o">=</span>-Dlink_cudss<span class="o">=</span><span class="nb">true</span><span class="w"> </span>-Csetup-args<span class="o">=</span>-Dint32<span class="o">=</span><span class="nb">true</span><span class="w"> </span>.
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="../api/python.html#python-interface"><span class="std std-ref">here</span></a> for how to enable the GPU when solving. The
+sparse direct GPU solver is typically very fast.</p>
+<p>See <a class="reference external" href="https://colab.research.google.com/drive/1POCgDNFg8fycHMI9T9N6V3iHFhXRthjn?usp=sharing">here</a> for an example colab where the cuDSS version of SCS, along with
+required dependencies, is installed and used.</p>
+</section>
+<section id="spectral-cones">
+<span id="python-spectral-install"></span><h2>Spectral cones<a class="headerlink" href="#spectral-cones" title="Link to this heading"></a></h2>
+<p>To enable <a class="reference internal" href="../api/cones.html#spectral-cones"><span class="std std-ref">spectral cone</span></a> support (log-determinant,
+nuclear norm, <span class="math notranslate nohighlight">\(\ell_1\)</span> norm, sum-of-largest-eigenvalues), install with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-Csetup-args<span class="o">=</span>-Duse_spectral_cones<span class="o">=</span><span class="nb">true</span><span class="w"> </span>.
+</pre></div>
+</div>
+<p>This requires LAPACK (enabled by default). See
+<span class="xref std std-ref">python_spectral_cone_keys</span> for the cone dict keys.</p>
+</section>
+<section id="testing">
+<h2>Testing<a class="headerlink" href="#testing" title="Link to this heading"></a></h2>
+<p>To test that SCS installed correctly, and you have pytest installed, run</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>.
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="../api/python.html#python-interface"><span class="std std-ref">here</span></a> for the full SCS python API.</p>
+<section id="legacy-options">
+<h3>Legacy options<a class="headerlink" href="#legacy-options" title="Link to this heading"></a></h3>
+<p>You can install with OpenMP parallelization support using</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>legacy_setup.py<span class="w"> </span>install<span class="w"> </span>--scs<span class="w"> </span>--openmp
+</pre></div>
+</div>
+<p>You can install the GPU indirect solver using</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>legacy_setup.py<span class="w"> </span>install<span class="w"> </span>--scs<span class="w"> </span>--gpu
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="c.html" class="btn btn-neutral float-left" title="C / C++" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="matlab.html" class="btn btn-neutral float-right" title="MATLAB" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Brendan O&#39;Donoghue.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+    <!-- Theme Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9CY7R8S5N2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-9CY7R8S5N2', {
+          'anonymize_ip': false,
+      });
+    </script> 
+
+</body>
+</html>
