@@ -86,16 +86,13 @@ message(STATUS "Read/write functionality is NOT ${NO_READ_WRITE}")
 option(USE_LAPACK "Whether to use BLAS/LAPACK" ON)
 message(STATUS "BLAS/LAPACK usage is ${USE_LAPACK}")
 
-<<<<<<< HEAD
 option(USE_CSD_CONE "Whether to use complex semidefinite (CSD) cones" ON)
 message(STATUS "CSD Cone usage is ${USE_CSD_CONE}")
 
 # spectral cones
-=======
 option(BLAS64 "Use 64-bit integers for BLAS/LAPACK" OFF)
 message(STATUS "64-bit BLAS integers are ${BLAS64}")
 
->>>>>>> refs/heads/master
 option(USE_SPECTRAL_CONES "Whether to use spectral cones (requires LAPACK)" OFF)
 if(USE_SPECTRAL_CONES AND NOT USE_LAPACK)
   message(FATAL_ERROR "USE_SPECTRAL_CONES requires USE_LAPACK to be ON")
