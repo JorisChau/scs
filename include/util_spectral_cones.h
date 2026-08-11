@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include "glbopts.h"
 #include "scs_blas.h"
 #include "scs_types.h"
 #include <assert.h>
