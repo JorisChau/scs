@@ -469,7 +469,7 @@ scs_int log_cone_IPM(scs_float t0, scs_float v0, scs_float *x0, scs_float *u1,
   step_size0 = 0.0;
 
 #ifdef SPECTRAL_DEBUG
-  printf("%-3s%-15s%-15s%-15s%-10s%-10s\n", "", "gap", "pres", "dres", "sig",
+  scs_printf("%-3s%-15s%-15s%-15s%-10s%-10s\n", "", "gap", "pres", "dres", "sig",
          "step");
 #endif
 
@@ -527,8 +527,8 @@ scs_int log_cone_IPM(scs_float t0, scs_float v0, scs_float *x0, scs_float *u1,
     if (dres < FEASTOL_IPM && pres < FEASTOL_IPM &&
         (gap < ABSTOL_IPM || relgap <= RELTOL_IPM)) {
 #ifdef SPECTRAL_DEBUG
-      printf("optimal solution found: \n");
-      printf("gap / pres / dres: %.7e, %.7e, %.7e \n", gap, pres, dres);
+      scs_printf("optimal solution found: \n");
+      scs_printf("gap / pres / dres: %.7e, %.7e, %.7e \n", gap, pres, dres);
 #endif
       break;
     }
@@ -699,7 +699,7 @@ scs_int log_cone_IPM(scs_float t0, scs_float v0, scs_float *x0, scs_float *u1,
     memcpy(z, z_new, 3 * sizeof(*z));
     memcpy(s, s_new, 3 * sizeof(*s));
 #ifdef SPECTRAL_DEBUG
-    printf("%ld: %.7e, %.7e, %.7e, %f, %.3f \n", iter, gap, pres, dres, sigma,
+    scs_printf("%ld: %.7e, %.7e, %.7e, %f, %.3f \n", iter, gap, pres, dres, sigma,
            step_size);
 #endif
   }

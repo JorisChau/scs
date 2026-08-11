@@ -41,7 +41,7 @@ GLOBAL void AMD_debug_init ( char *s )
     }
     if (AMD_debug >= 0)
     {
-	printf ("%s: AMD_debug_init, D= " ID "\n", s, AMD_debug) ;
+	scs_printf ("%s: AMD_debug_init, D= " ID "\n", s, AMD_debug) ;
     }
 }
 

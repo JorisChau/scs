@@ -18,7 +18,7 @@
   do {                                                                         \
     cudaError_t status = call;                                                 \
     if (status != cudaSuccess) {                                               \
-      printf("CUDA call " #fname " returned status = %d\n", status);           \
+      scs_printf("CUDA call " #fname " returned status = %d\n", status);           \
       scs_free_lin_sys_work(p);                                                \
       return SCS_NULL;                                                         \
     }                                                                          \

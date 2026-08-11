@@ -351,7 +351,7 @@ ScsLinSysWork *scs_init_lin_sys_work(const ScsMatrix *A, const ScsMatrix *P,
 
   err = cudaGetLastError();
   if (err != cudaSuccess) {
-    printf("%s:%d:%s\nERROR_CUDA (*): %s\n", __FILE__, __LINE__, __func__,
+    scs_printf("%s:%d:%s\nERROR_CUDA (*): %s\n", __FILE__, __LINE__, __func__,
            cudaGetErrorString(err));
     scs_free_lin_sys_work(p);
     return SCS_NULL;
