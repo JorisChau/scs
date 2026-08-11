@@ -487,22 +487,22 @@ static void format_cone_header(const ScsCone *k, char *buf, size_t *len) {
 
   append_to_header(buf, len, "cones: ");
   if (k->z) {
-    sprintf(line, "\t  z: primal zero / dual free vars: %li\n", (long)k->z);
+    snprintf(line, sizeof(line), "\t  z: primal zero / dual free vars: %li\n", (long)k->z);
     append_to_header(buf, len, line);
   }
   if (k->l) {
-    sprintf(line, "\t  l: linear vars: %li\n", (long)k->l);
+    snprintf(line, sizeof(line), "\t  l: linear vars: %li\n", (long)k->l);
     append_to_header(buf, len, line);
   }
   if (k->bsize) {
-    sprintf(line, "\t  b: box cone vars: %li\n", (long)k->bsize);
+    snprintf(line, sizeof(line), "\t  b: box cone vars: %li\n", (long)k->bsize);
     append_to_header(buf, len, line);
   }
   if (k->qsize) {
     count = 0;
     for (i = 0; i < k->qsize; ++i)
       count += k->q[i];
-    sprintf(line, "\t  q: soc vars: %li, qsize: %li\n", (long)count,
+    snprintf(line, sizeof(line), "\t  q: soc vars: %li, qsize: %li\n", (long)count,
             (long)k->qsize);
     append_to_header(buf, len, line);
   }
@@ -510,7 +510,7 @@ static void format_cone_header(const ScsCone *k, char *buf, size_t *len) {
     count = 0;
     for (i = 0; i < k->ssize; ++i)
       count += get_sd_cone_size(k->s[i]);
-    sprintf(line, "\t  s: psd vars: %li, ssize: %li\n", (long)count,
+    snprintf(line, sizeof(line), "\t  s: psd vars: %li, ssize: %li\n", (long)count,
             (long)k->ssize);
     append_to_header(buf, len, line);
   }
@@ -519,18 +519,18 @@ static void format_cone_header(const ScsCone *k, char *buf, size_t *len) {
     count = 0;
     for (i = 0; i < k->cssize; ++i)
       count += get_csd_cone_size(k->cs[i]);
-    sprintf(line, "\t  cs: complex psd vars: %li, cssize: %li\n", (long)count,
+    snprintf(line, sizeof(line), "\t  cs: complex psd vars: %li, cssize: %li\n", (long)count,
             (long)k->cssize);
     append_to_header(buf, len, line);
   }
 #endif
   if (k->ep || k->ed) {
-    sprintf(line, "\t  e: exp vars: %li, dual exp vars: %li\n",
+    snprintf(line, sizeof(line), "\t  e: exp vars: %li, dual exp vars: %li\n",
             (long)(3 * k->ep), (long)(3 * k->ed));
     append_to_header(buf, len, line);
   }
   if (k->psize) {
-    sprintf(line, "\t  p: primal + dual power vars: %li\n",
+    snprintf(line, sizeof(line), "\t  p: primal + dual power vars: %li\n",
             (long)(3 * k->psize));
     append_to_header(buf, len, line);
   }
@@ -540,7 +540,7 @@ static void format_cone_header(const ScsCone *k, char *buf, size_t *len) {
     for (i = 0; i < k->dsize; i++) {
       log_vars += get_sd_cone_size(k->d[i]) + 2;
     }
-    sprintf(line, "\t  d: logdet vars: %li, dsize: %li\n", (long)log_vars,
+    snprintf(line, sizeof(line), "\t  d: logdet vars: %li, dsize: %li\n", (long)log_vars,
             (long)k->dsize);
     append_to_header(buf, len, line);
   }
@@ -549,7 +549,7 @@ static void format_cone_header(const ScsCone *k, char *buf, size_t *len) {
     for (i = 0; i < k->nucsize; i++) {
       nuc_vars += k->nuc_m[i] * k->nuc_n[i] + 1;
     }
-    sprintf(line, "\t  nuc: nuclear vars: %li, nucsize: %li\n",
+    snprintf(line, sizeof(line), "\t  nuc: nuclear vars: %li, nucsize: %li\n",
             (long)nuc_vars, (long)k->nucsize);
     append_to_header(buf, len, line);
   }
@@ -558,7 +558,7 @@ static void format_cone_header(const ScsCone *k, char *buf, size_t *len) {
     for (i = 0; i < k->ell1_size; ++i) {
       ell1_vars += k->ell1[i] + 1;
     }
-    sprintf(line, "\t  ell1: ell1 vars: %li, ell1_size: %li\n",
+    snprintf(line, sizeof(line), "\t  ell1: ell1 vars: %li, ell1_size: %li\n",
             (long)ell1_vars, (long)k->ell1_size);
     append_to_header(buf, len, line);
   }
@@ -567,7 +567,7 @@ static void format_cone_header(const ScsCone *k, char *buf, size_t *len) {
     for (i = 0; i < k->sl_size; ++i) {
       sl_vars += get_sd_cone_size(k->sl_n[i]) + 1;
     }
-    sprintf(line, "\t  sl: sl vars: %li, sl_size: %li\n", (long)sl_vars,
+    snprintf(line, sizeof(line), "\t  sl: sl vars: %li, sl_size: %li\n", (long)sl_vars,
             (long)k->sl_size);
     append_to_header(buf, len, line);
   }
