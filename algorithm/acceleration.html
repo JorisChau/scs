@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Acceleration &mdash; SCS 3.2.11 documentation</title>
+  <title>Acceleration &mdash; SCS 3.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/css/scs_theme.css?v=7d28eb0c" />
@@ -15,7 +15,7 @@
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=537ea5e8"></script>
+      <script src="../_static/documentation_options.js?v=3eb8911e"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -235,8 +235,10 @@ then AA is applied every <span class="math notranslate nohighlight">\(k\)</span>
 intermediate iterations). This has the benefit of making AA <span class="math notranslate nohighlight">\(k\)</span> times
 faster and approximating a <span class="math notranslate nohighlight">\(k\)</span> times larger memory, as well as improving
 numerical stability by ‘decorrelating’ the data. On the other hand, older
-iterates might be stale.  More work is needed to determine the optimal setting
-for this parameter, but 10 appears to work well in practice and is the default.</p>
+iterates might be stale.  Benchmark sweeps over the netlib LP and
+Maros-Meszaros QP collections found 5 to be a robust choice in practice
+(intervals near 1 destabilize the least-squares fit, very large intervals
+leave acceleration idle), and 5 is the default.</p>
 <p>The details about how the linear systems are solved and updated are abstracted
 away into the AA package. The current implementation uses a rank-revealing
 pivoted QR factorization (LAPACK <code class="code docutils literal notranslate"><span class="pre">geqp3</span></code>) of the augmented matrix (with

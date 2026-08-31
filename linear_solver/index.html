@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Linear System Solver &mdash; SCS 3.2.11 documentation</title>
+  <title>Linear System Solver &mdash; SCS 3.3.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/css/scs_theme.css?v=7d28eb0c" />
@@ -15,7 +15,7 @@
     <link rel="shortcut icon" href="../_static/favicon.ico"/>
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=537ea5e8"></script>
+      <script src="../_static/documentation_options.js?v=3eb8911e"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -188,8 +188,10 @@ It does not support 64-bit integer indexing (<code class="docutils literal notra
 </pre></div>
 </div>
 <p>In Python, the Accelerate backend is included automatically on macOS
-(<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">scs</span></code> is sufficient). Select it at solve time:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">solver</span> <span class="o">=</span> <span class="n">scs</span><span class="o">.</span><span class="n">SCS</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">cone</span><span class="p">,</span> <span class="n">apple_ldl</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+(<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">scs</span></code> is sufficient). On macOS,
+<code class="docutils literal notranslate"><span class="pre">linear_solver=scs.LinearSolver.AUTO</span></code> selects the bundled QDLDL; select
+Accelerate explicitly with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">solver</span> <span class="o">=</span> <span class="n">scs</span><span class="o">.</span><span class="n">SCS</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">cone</span><span class="p">,</span> <span class="n">linear_solver</span><span class="o">=</span><span class="n">scs</span><span class="o">.</span><span class="n">LinearSolver</span><span class="o">.</span><span class="n">ACCELERATE</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -202,10 +204,19 @@ It does not support 64-bit integer indexing (<code class="docutils literal notra
                           y &amp; = R_y^{-1}(A x - z^k_y).\end{split}\]</div>
 <p>then solves the positive definite system using using <a class="reference external" href="https://en.wikipedia.org/wiki/Conjugate_gradient_method">conjugate gradients</a>.  Each iteration of
 CG requires one multiply each of sparse matrices <span class="math notranslate nohighlight">\(P, A, A^\top\)</span>.  The
-system is solved up to some tolerance, which is tuned to ensure that the overall
-algorithm converges. The tolerance decays with iteration <span class="math notranslate nohighlight">\(k\)</span> like
-<span class="math notranslate nohighlight">\(O(1/k^\gamma)\)</span> where <span class="math notranslate nohighlight">\(\gamma &gt; 1\)</span> and is determined by the constant
-<code class="code docutils literal notranslate"><span class="pre">CG_RATE</span></code> (defaults to <span class="math notranslate nohighlight">\(1.5\)</span>).</p>
+system is solved up to some tolerance, which is tuned to ensure that the
+overall algorithm converges: each solve targets a small fraction
+(<code class="code docutils literal notranslate"><span class="pre">CG_TOL_FACTOR</span></code>, default <span class="math notranslate nohighlight">\(0.03\)</span>) of the smaller of the current
+primal and dual residuals, additionally capped by a term decaying with
+iteration <span class="math notranslate nohighlight">\(k\)</span> like <span class="math notranslate nohighlight">\(O(1/k^\gamma)\)</span> where <span class="math notranslate nohighlight">\(\gamma\)</span> is
+determined by the constant <code class="code docutils literal notranslate"><span class="pre">CG_RATE</span></code> (defaults to <span class="math notranslate nohighlight">\(2\)</span>), and
+floored at <code class="code docutils literal notranslate"><span class="pre">CG_BEST_TOL</span></code>. Each solve is warm-started from the previous
+solution. The solver also harvests approximate eigenvectors of the reduced
+matrix from the CG iterations themselves (eigCG; Stathopoulos and Orginos
+2010) and uses up to <code class="code docutils literal notranslate"><span class="pre">DEFLATE_VECTORS</span></code> (default 30) of them to deflate
+the smallest eigenvalues from subsequent solves, which substantially reduces
+the CG iterations needed on ill-conditioned problems at no additional
+matrix-multiply cost.</p>
 <p>The indirect method has the advantage of not requiring an expensive
 factorization but typically is slower on a per-iteration basis. In most cases
 the factorization is relatively cheap so the direct method is the default,
