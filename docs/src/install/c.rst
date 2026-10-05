@@ -80,6 +80,32 @@ needs help, set :code:`BLA_VENDOR` explicitly.
 GPU
 """
 
+If you have a GPU and the CUDA toolkit installed, you can build the
+:ref:`GPU indirect <gpu_indirect>` solver:
+
+.. code:: bash
+
+  cmake -DCMAKE_INSTALL_PREFIX:PATH=<custom-folder> -DUSE_GPU=ON ../
+  make
+
+This builds and installs the GPU solver with target
+:code:`scs::scsgpuindir`. CMake locates the CUDA runtime, cuBLAS and cuSPARSE
+with `FindCUDAToolkit
+<https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html>`_, which
+honors :code:`CUDAToolkit_ROOT` if the toolkit lives somewhere unusual. Both
+integer widths work, so :code:`DLONG` may be left at either setting. The
+transpose of :code:`A` is stored in GPU memory by default; configure with
+:code:`-DGPU_TRANSPOSE_MAT=OFF` to save that memory at the cost of slower
+matrix-transpose-vector products.
+
+Note that the GPU is typically only faster than the CPU for very large
+problems, and that the indirect solver is a legacy backend: the cuDSS direct
+solver described below is the recommended GPU backend and should be preferred
+whenever cuDSS is available.
+
+cuDSS
+"""""
+
 If you have a GPU and CUDA toolkit installed, along with the
 `cuDSS <https://developer.nvidia.com/cudss>`_ library, you can compile SCS
 with cuDSS support using CMake. First, ensure that the :code:`CUDA_PATH` and
@@ -188,6 +214,21 @@ binaries in the out folder corresponding to the GPU version.  Note that the GPU
 
   make gpu DLONG=0
   out/run_tests_gpu_indirect
+
+The GPU sources are compiled by the host C compiler rather than by
+:code:`nvcc`, so they include the CUDA headers directly.  This means the
+:code:`crt` headers must be present alongside the runtime: up to CUDA 12 they
+were part of the :code:`cuda_nvcc` component, whereas CUDA 13 moved them into a
+separate :code:`cuda_crt` component.  A partial installation that omits it
+fails with
+
+.. code:: text
+
+  driver_types.h:59:30: fatal error: crt/host_defines.h: No such file or directory
+
+Installing the full CUDA toolkit pulls the component in automatically; only
+builds that pick individual components (distribution packaging, for instance)
+need to request it explicitly.
 
 Finally, to compile and test the :ref:`cuDSS solver <cudss_solver>` you need to
 have CUDA toolkit, the :code:`nvcc` compiler, and `cuDSS

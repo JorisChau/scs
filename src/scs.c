@@ -24,7 +24,22 @@
 #ifdef SCS_MKL
 #define MKL_INTERFACE_LP64 0
 #define MKL_INTERFACE_ILP64 1
+/* MKL's interface-layer value is a bitmask: bit 0 selects the integer
+ * width (LP64/ILP64) and bit 1 is the GNU Fortran calling-convention
+ * flag, so MKL_Set_Interface_Layer can legitimately return 2 (LP64|GNU)
+ * or 3 (ILP64|GNU) -- e.g. when an MKL-backed NumPy initialized MKL
+ * first. Only the width bit affects integer-size safety. */
+#define MKL_INTERFACE_GNU 2
+/* bit 0 of the layer value selects the integer width (LP64/ILP64) */
+#define MKL_INTERFACE_WIDTH_MASK MKL_INTERFACE_ILP64
+/* Only libmkl_rt provides this; a static MKL link has nothing to negotiate,
+ * so the reference is weak and the check is skipped when the symbol is
+ * absent (MSVC links mkl_rt dynamically and keeps the strong reference). */
+#if defined(__GNUC__)
+int MKL_Set_Interface_Layer(int) __attribute__((weak));
+#else
 int MKL_Set_Interface_Layer(int);
+#endif
 
 static const char *scs_mkl_interface_name(int layer) {
   switch (layer) {
@@ -32,6 +47,10 @@ static const char *scs_mkl_interface_name(int layer) {
     return "LP64";
   case MKL_INTERFACE_ILP64:
     return "ILP64";
+  case MKL_INTERFACE_LP64 | MKL_INTERFACE_GNU:
+    return "LP64 (GNU)";
+  case MKL_INTERFACE_ILP64 | MKL_INTERFACE_GNU:
+    return "ILP64 (GNU)";
   default:
     return "unknown";
   }
@@ -56,8 +75,25 @@ static scs_int scs_init_mkl_runtime(void) {
 #else
     int expected = MKL_INTERFACE_LP64;
 #endif
-    int actual = MKL_Set_Interface_Layer(expected);
-    if (actual != expected) {
+    int actual;
+#if defined(__GNUC__)
+    if (!MKL_Set_Interface_Layer) {
+      /* static MKL: no runtime interface layer exists to query */
+      return 0;
+    }
+#endif
+    actual = MKL_Set_Interface_Layer(expected);
+    /* MKL returns -1 for an invalid request; without this guard the width
+     * comparison below would misread it ((-1 & 1) == 1, i.e. ILP64) */
+    if (actual < 0) {
+      scs_printf("MKL_Set_Interface_Layer(%d) failed with error %d.\n",
+                 expected, actual);
+      return -1;
+    }
+    /* compare only the integer-width bit: the GNU flag is a Fortran
+     * calling-convention variant with the same integer sizes */
+    if ((actual & MKL_INTERFACE_WIDTH_MASK) !=
+        (expected & MKL_INTERFACE_WIDTH_MASK)) {
       scs_printf("MKL interface layer mismatch: expected %s, but MKL is using "
                  "%s (%d). Another library in this process likely "
                  "initialized MKL with an incompatible LP64/ILP64 setting.\n",
@@ -439,10 +475,10 @@ static scs_int validate(const ScsData *d, const ScsCone *k,
                "(use acceleration_type_1=0 for type-II AA).\n");
     return -1;
   }
-  if (!isfinite(stgs->acceleration_regularization) ||
-      stgs->acceleration_regularization < 0) {
-    scs_printf("acceleration_regularization must be a nonnegative finite "
-               "number.\n");
+  if (!isfinite(stgs->acceleration_regularization)) {
+    /* Sign-encoded modes per include/aa.h: positive = scaled by
+     * ||A||_F ||Y||_F, negative = pinned absolute value, zero = off. */
+    scs_printf("acceleration_regularization must be a finite number.\n");
     return -1;
   }
   if (!isfinite(stgs->acceleration_relaxation) ||
@@ -1078,17 +1114,6 @@ static ScsWork *init_work(const ScsData *d, const ScsCone *k,
   w->r_orig = init_residuals(w->d);
   w->b_orig = (scs_float *)scs_calloc(w->d->m, sizeof(scs_float));
   w->c_orig = (scs_float *)scs_calloc(w->d->n, sizeof(scs_float));
-#ifdef USE_SPECTRAL_CONES
-  if (w->stgs->adaptive_diag_scale &&
-      (w->k->dsize || w->k->nucsize || w->k->ell1_size || w->k->sl_size)) {
-    /* The spectral-cone projections are iterative inner solvers with
-     * warm-start state that does not currently tolerate mid-solve metric
-     * changes (observed as dual iterates leaving the cone). Disable
-     * dynamic diagonal rescaling on such problems until the inner
-     * solvers are made metric-change aware. */
-    w->stgs->adaptive_diag_scale = 0;
-  }
-#endif
   if (w->stgs->adaptive_diag_scale) {
     if (!w->stgs->adaptive_scale) {
       /* silently disable: diag scaling rides the adaptive-scale update
@@ -1223,6 +1248,10 @@ static scs_int update_work(ScsWork *w, ScsSolution *sol) {
   } else {
     cold_start_vars(w);
   }
+
+  /* the cached spectral warm starts describe the iterates of the previous
+   * solve, which the (re)start above has just discarded */
+  SCS(reset_cone_cache)(w->cone_work);
 
   update_work_cache(w);
   return 0;
@@ -1374,6 +1403,11 @@ static scs_int update_scale(ScsWork *w, const ScsCone *k, scs_int iter) {
     if (w->accel) {
       aa_reset(w->accel);
     }
+    /* Same reasoning for the cone projections: the spectral cones' inner
+     * solvers warm-start from state computed under the metric we just
+     * replaced, so drop it rather than let it seed the next iteration's
+     * projection (see SCS(reset_cone_cache)). */
+    SCS(reset_cone_cache)(w->cone_work);
     /* update v, using fact that rsk, u, u_t vectors should be the same */
     /* solve: R^+ (v^+ + u - 2u_t) = rsk = R(v + u - 2u_t)
      *  => v^+ = R+^-1 rsk + 2u_t - u

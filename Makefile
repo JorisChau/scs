@@ -88,8 +88,9 @@ $(DIRSRC)/private.o: $(DIRSRC)/private.c  $(DIRSRC)/private.h
 $(INDIRSRC)/private.o: $(INDIRSRC)/private.c $(INDIRSRC)/private.h
 $(DENSESRC)/private.o: $(DENSESRC)/private.c  $(DENSESRC)/private.h
 $(MKLSRC)/private.o: $(MKLSRC)/private.c  $(MKLSRC)/private.h
+# --coverage is a host compiler option, so nvcc needs it via -Xcompiler.
 $(CUDSSSRC)/private.o: $(CUDSSSRC)/private.c  $(CUDSSSRC)/private.h
-	$(CUCC) $(INCLUDE) $(CUDSS_FLAGS) -I$(CUDSSSRC) -c $(CUDSSSRC)/private.c -o $@
+	$(CUCC) $(INCLUDE) $(patsubst --coverage,-Xcompiler=--coverage,$(CUSTOM_FLAGS)) $(CUDSS_FLAGS) -I$(CUDSSSRC) -c $(CUDSSSRC)/private.c -o $@
 $(ACCELSRC)/private.o: $(ACCELSRC)/private.c  $(ACCELSRC)/private.h
 $(LINSYS)/scs_matrix.o: $(LINSYS)/scs_matrix.c $(LINSYS)/scs_matrix.h
 $(LINSYS)/csparse.o: $(LINSYS)/csparse.c $(LINSYS)/csparse.h
@@ -124,29 +125,33 @@ $(OUT)/libscsaccel.a: $(SCS_O) $(SCS_OBJECTS) $(ACCELSRC)/private.o $(LINSYS)/sc
 	$(ARCHIVE) $@ $^
 	- $(RANLIB) $@
 
-$(OUT)/libscsdir.$(SHARED): $(SCS_O) $(SCS_OBJECTS) $(DIRSRC)/private.o $(AMD_OBJS) $(LDL_OBJS) $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o
+# Link a shared library as its versioned file with the ABI version as its
+# soname/install_name, then point the unversioned name at it (Windows: the
+# DLL itself, unversioned). $(1): extra link flags.
+V = $(call versioned,$@)
+define link_shared
 	mkdir -p $(OUT)
-	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(@:$(OUT)/%=%) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS)
+	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(notdir $(V)) -o $(V) $^ $(LDFLAGS) $(1)
+	[ "$(V)" = "$@" ] || ln -sf $(notdir $(V)) $@
+endef
+
+$(OUT)/libscsdir.$(SHARED): $(SCS_O) $(SCS_OBJECTS) $(DIRSRC)/private.o $(AMD_OBJS) $(LDL_OBJS) $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o
+	$(call link_shared,$(BLASLDFLAGS))
 
 $(OUT)/libscsindir.$(SHARED): $(SCS_INDIR_O) $(SCS_OBJECTS) $(INDIRSRC)/private.o $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o
-	mkdir -p $(OUT)
-	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(@:$(OUT)/%=%) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS)
+	$(call link_shared,$(BLASLDFLAGS))
 
 $(OUT)/libscsdense.$(SHARED): $(SCS_O) $(SCS_OBJECTS) $(DENSESRC)/private.o $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o
-	mkdir -p $(OUT)
-	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(@:$(OUT)/%=%) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS)
+	$(call link_shared,$(BLASLDFLAGS))
 
 $(OUT)/libscsmkl.$(SHARED): $(SCS_MKL_O) $(SCS_OBJECTS) $(MKLSRC)/private.o $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o
-	mkdir -p $(OUT)
-	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(@:$(OUT)/%=%) -o $@ $^ $(LDFLAGS) $(MKLFLAGS)
+	$(call link_shared,$(MKLFLAGS))
 
 $(OUT)/libscscudss.$(SHARED): $(SCS_O) $(SCS_OBJECTS) $(CUDSSSRC)/private.o $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o
-	mkdir -p $(OUT)
-	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(@:$(OUT)/%=%) -o $@ $^ $(LDFLAGS) $(CULDFLAGS)
+	$(call link_shared,$(CULDFLAGS))
 
 $(OUT)/libscsaccel.$(SHARED): $(SCS_O) $(SCS_OBJECTS) $(ACCELSRC)/private.o $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o
-	mkdir -p $(OUT)
-	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(@:$(OUT)/%=%) -o $@ $^ $(LDFLAGS) -framework Accelerate
+	$(call link_shared,-framework Accelerate)
 
 $(OUT)/demo_socp_direct: test/random_socp_prob.c $(OUT)/libscsdir.a
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS)
@@ -191,6 +196,8 @@ $(OUT)/run_tests_indirect: test/run_tests.c $(OUT)/libscsindir.a
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS) -Itest
 $(OUT)/run_tests_direct: test/run_tests.c $(OUT)/libscsdir.a
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS) -Itest
+$(OUT)/test_rw_settings: test/rw_settings.c test/problems/test_rw_settings.h $(OUT)/libscsdir.a
+	$(CC) $(CFLAGS) -o $@ $< $(OUT)/libscsdir.a $(LDFLAGS) $(BLASLDFLAGS) -Itest
 $(OUT)/run_tests_dense: test/run_tests.c $(OUT)/libscsdense.a
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS) -Itest
 $(OUT)/run_tests_mkl: test/run_tests.c $(OUT)/libscsmkl.a
@@ -234,8 +241,7 @@ $(GPUINDIR)/private.o: $(GPUINDIR)/private.c
 	$(CC) -c -o $@ $^ $(CUDAFLAGS)
 
 $(OUT)/libscsgpuindir.$(SHARED): $(SCS_INDIR_O) $(SCS_OBJECTS) $(GPUINDIR)/private.o $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o $(LINSYS)/gpu/gpu.o
-	mkdir -p $(OUT)
-	$(CC) $(CFLAGS) -shared -Wl,$(SONAME),$(@:$(OUT)/%=%) -o $@ $^ $(LDFLAGS) $(BLASLDFLAGS) $(CULDFLAGS)
+	$(call link_shared,$(BLASLDFLAGS) $(CULDFLAGS))
 
 $(OUT)/libscsgpuindir.a: $(SCS_INDIR_O) $(SCS_OBJECTS) $(GPUINDIR)/private.o $(LINSYS)/scs_matrix.o $(LINSYS)/csparse.o $(LINSYS)/gpu/gpu.o
 	mkdir -p $(OUT)
@@ -247,7 +253,7 @@ $(OUT)/demo_socp_gpu_indirect: test/random_socp_prob.c $(OUT)/libscsgpuindir.a
 
 .PHONY: clean purge
 clean:
-	@rm -rf $(TARGETS) $(SCS_O) $(SCS_INDIR_O) $(SCS_MKL_O) $(SCS_OBJECTS) $(AMD_OBJS) $(LDL_OBJS) $(LINSYS)/*.o $(DIRSRC)/*.o $(INDIRSRC)/*.o $(DENSESRC)/*.o $(MKLSRC)/*.o $(ACCELSRC)/*.o $(GPUDIR)/*.o $(GPUINDIR)/*.o $(LINSYS)/gpu/*.o src/spectral_cones/*.o src/spectral_cones/*/*.o
+	@rm -rf $(TARGETS) $(SCS_O) $(SCS_INDIR_O) $(SCS_MKL_O) $(SCS_OBJECTS) $(AMD_OBJS) $(LDL_OBJS) $(LINSYS)/*.o $(DIRSRC)/*.o $(INDIRSRC)/*.o $(DENSESRC)/*.o $(MKLSRC)/*.o $(CUDSSSRC)/*.o $(ACCELSRC)/*.o $(GPUDIR)/*.o $(GPUINDIR)/*.o $(LINSYS)/gpu/*.o src/spectral_cones/*.o src/spectral_cones/*/*.o
 	@rm -rf $(OUT)/*.dSYM
 	@rm -rf matlab/*.mex*
 	@rm -rf .idea
@@ -261,6 +267,14 @@ INSTALL_INC_FILES = $(INC_FILES)
 INSTALL_TARGETS = $(OUT)/libscsdir.a $(OUT)/libscsindir.a $(OUT)/libscsdir.$(SHARED) $(OUT)/libscsindir.$(SHARED)
 INSTALL_GPU_TARGETS = $(OUT)/libscsgpuindir.a $(OUT)/libscsgpuindir.$(SHARED)
 
+# shared libraries are installed under their versioned names with the
+# unversioned symlink alongside
+INSTALL_SHARED = $(filter %.$(SHARED),$(INSTALL_TARGETS))
+INSTALL_GPU_SHARED = $(filter %.$(SHARED),$(INSTALL_GPU_TARGETS))
+# the versioned files, plus the unversioned symlinks copied as symlinks
+install_shared = $(INSTALL) -m 644 $(call versioned,$(1)) $(INSTALL_LIB_DIR) && \
+	{ [ "$(call versioned,$(1))" = "$(1)" ] || cp -RP $(1) $(INSTALL_LIB_DIR); }
+
 INSTALL_INC_DIR = $(DESTDIR)$(PREFIX)/include/scs/
 INSTALL_LIB_DIR = $(DESTDIR)$(PREFIX)/lib/
 
@@ -271,10 +285,12 @@ dense: $(OUT)/libscsdense.a $(OUT)/libscsdense.$(SHARED) $(OUT)/run_tests_dense 
 install: $(INSTALL_INC_FILES) $(INSTALL_TARGETS)
 	$(INSTALL) -d $(INSTALL_INC_DIR) $(INSTALL_LIB_DIR)
 	$(INSTALL) -m 644 $(INSTALL_INC_FILES) $(INSTALL_INC_DIR)
-	$(INSTALL) -m 644 $(INSTALL_TARGETS) $(INSTALL_LIB_DIR)
+	$(INSTALL) -m 644 $(filter-out %.$(SHARED),$(INSTALL_TARGETS)) $(INSTALL_LIB_DIR)
+	$(call install_shared,$(INSTALL_SHARED))
 install_gpu: $(INSTALL_INC_FILES) $(INSTALL_GPU_TARGETS)
 	$(INSTALL) -d $(INSTALL_INC_DIR) $(INSTALL_LIB_DIR)
 	$(INSTALL) -m 644 $(INSTALL_INC_FILES) $(INSTALL_INC_DIR)
-	$(INSTALL) -m 644 $(INSTALL_GPU_TARGETS) $(INSTALL_LIB_DIR)
+	$(INSTALL) -m 644 $(filter-out %.$(SHARED),$(INSTALL_GPU_TARGETS)) $(INSTALL_LIB_DIR)
+	$(call install_shared,$(INSTALL_GPU_SHARED))
 direct: $(OUT)/libscsdir.$(SHARED) $(OUT)/demo_socp_direct $(OUT)/run_from_file_direct $(OUT)/run_tests_direct
 indirect: $(OUT)/libscsindir.$(SHARED) $(OUT)/demo_socp_indirect $(OUT)/run_from_file_indirect $(OUT)/run_tests_indirect

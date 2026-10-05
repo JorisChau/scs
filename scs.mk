@@ -28,28 +28,43 @@ endif
 endif
 endif
 
+# ABI version embedded in the shared-library soname/install_name, derived from
+# SCS_VERSION (keep project() in CMakeLists.txt in step). Bump on ABI breaks,
+# never on patch releases.
+SCS_SOVERSION := $(shell awk -F'"' '/define SCS_VERSION/ {split($$2, v, "."); print v[1] "." v[2]}' include/glbopts.h)
+
+# versioned(name): the file a shared library is linked as; the unversioned
+# name becomes a symlink to it (libscsdir.so.3.3, libscsdir.3.3.dylib).
+# Windows DLLs stay unversioned.
 ifeq ($(UNAME), Darwin)
 # we're on apple, no need to link rt library
 LDFLAGS += -lm
 SHARED = dylib
 SONAME = -install_name
+versioned = $(1:%.dylib=%.$(SCS_SOVERSION).dylib)
 else
 ifeq ($(ISWINDOWS), 1)
 # we're on windows (cygwin or msys)
 LDFLAGS += -lm
 SHARED = dll
 SONAME = -soname
+versioned = $(1)
 else
 # we're on a linux system, use accurate timer provided by clock_gettime()
 LDFLAGS += -lm -lrt -lpthread
 SHARED = so
 SONAME = -soname
+versioned = $(1:%.so=%.so.$(SCS_SOVERSION))
 endif
 endif
 
 # Default CUDA path; override with CUDA_PATH=/path/to/cuda
 ifeq ($(CUDA_PATH), )
 CUDA_PATH=/usr/local/cuda
+endif
+
+# Default the compiler independently, including when CUDA_PATH is supplied.
+ifeq ($(CUCC), )
 CUCC = $(CUDA_PATH)/bin/nvcc
 endif
 
